@@ -1,0 +1,5 @@
+{
+  "name": "CloudOps Console",
+  "description": "A professional, responsive cloud management console featuring dynamic layouts (Sidebar/Header), multiple themes (Light/Dark/Dracula), and high-density data visualization.",
+  "requestFramePermissions": []
+}
