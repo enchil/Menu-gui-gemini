@@ -50,13 +50,13 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       {
         id: 'release-mgmt',
-        label: 'Release Management',
+        label: 'Update Service Management',
         icon: Package,
         path: '/update-service/release'
       },
       {
         id: 'update-tools',
-        label: 'Tools & Utilities',
+        label: 'App Client Management',
         icon: Wrench,
         path: '/update-service/tools'
       }

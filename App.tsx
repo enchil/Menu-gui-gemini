@@ -4,6 +4,7 @@ import { Navigation } from './components/Navigation';
 import { TopBar } from './components/TopBar';
 import { DataTable } from './components/DataTable';
 import { AgentHub } from './components/AgentHub';
+import { AppClientList } from './components/AppClientList'; // Import the new component
 import { AppTheme, LayoutMode } from './types';
 
 const MainLayout: React.FC = () => {
@@ -24,6 +25,9 @@ const MainLayout: React.FC = () => {
 
   // Simple Router
   const renderContent = () => {
+    if (activePath === '/update-service/tools') {
+        return <AppClientList />;
+    }
     if (activePath.startsWith('/update-service')) {
       return <AgentHub />;
     }
