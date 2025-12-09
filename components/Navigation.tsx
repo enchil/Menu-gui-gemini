@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../contexts/AppContext';
 import { NAV_ITEMS } from '../constants';
 import { 
@@ -10,7 +11,7 @@ import {
   OverflowMode, 
   HeaderDropdownMode 
 } from '../types';
-import { ChevronDown, ChevronRight, X, Command, MoreHorizontal } from 'lucide-react';
+import { ChevronDown, ChevronRight, X, Command, MoreHorizontal, Circle } from 'lucide-react';
 
 export const Navigation: React.FC = () => {
   const { 
@@ -94,93 +95,218 @@ export const Navigation: React.FC = () => {
   // HEADER IMPLEMENTATION
   // ==========================================
 
-  // Mega Menu Item (Grid Layout)
-  const HeaderMegaMenu = ({ items }: { items: NavItem[] }) => {
+  // --- MEGA MENU (Recursive Tree) ---
+  const MegaMenuNode: React.FC<{ item: NavItem, depth: number }> = ({ item, depth }) => {
+    const hasChildren = item.children && item.children.length > 0;
+    
     return (
-      <div className={`
-          absolute top-full left-0 mt-1 p-6
-          grid grid-cols-3 gap-6 w-[800px]
-          rounded-md border z-50
-          invisible opacity-0 group-hover:visible group-hover:opacity-100
-          transition-all duration-200 ease-out
-          ${getDropdownColors()}
-      `}>
-          {items.map(colRoot => (
-            <div key={colRoot.id}>
-               <h4 className={`font-semibold mb-3 flex items-center gap-2 ${theme === AppTheme.LIGHT ? 'text-slate-900' : 'text-white'}`}>
-                  <colRoot.icon size={16} />
-                  {colRoot.label}
-               </h4>
-               <ul className="space-y-2">
-                 {colRoot.children?.map(child => (
-                   <li key={child.id}>
-                     <button 
-                        onClick={() => handleLinkClick(child)}
-                        className={`text-sm opacity-80 hover:opacity-100 hover:underline block w-full text-left`}
-                     >
-                       {child.label}
-                     </button>
-                   </li>
-                 ))}
-                 {!colRoot.children && <li className="text-xs opacity-50 italic">No sub-items</li>}
-               </ul>
-            </div>
-          ))}
+      <div className="mb-1">
+        <button 
+          onClick={() => handleLinkClick(item)}
+          className={`
+            text-sm block w-full text-left transition-colors flex items-center gap-2
+            ${depth === 0 ? 'font-semibold mb-2 ' + (theme === AppTheme.LIGHT ? 'text-slate-900' : 'text-white') : 'opacity-80 hover:opacity-100 hover:underline py-1'}
+          `}
+          style={{ paddingLeft: depth > 0 ? `${depth * 12}px` : 0 }}
+        >
+          {depth === 0 && <item.icon size={16} />}
+          {depth > 0 && <span className="opacity-30">•</span>}
+          <span>{item.label}</span>
+        </button>
+        {hasChildren && (
+          <div className="ml-0">
+            {item.children!.map(child => (
+              <MegaMenuNode key={child.id} item={child} depth={depth + 1} />
+            ))}
+          </div>
+        )}
       </div>
     );
   };
 
-  const HeaderCascadingMenu = ({ items, depth }: { items: NavItem[], depth: number }) => {
-      const isRoot = depth === 0;
-      return (
-        <ul className={`
-            absolute z-50 min-w-[220px] rounded-md border py-1
-            invisible opacity-0 group-hover:visible group-hover:opacity-100 
-            transition-all duration-200 ease-out origin-top-left
-            ${isRoot ? 'top-full left-0 mt-1' : 'top-0 left-full ml-0'}
-            ${getDropdownColors()}
-        `}>
-            {items.map(item => <HeaderItem key={item.id} item={item} depth={depth + 1} />)}
-        </ul>
+  const HeaderMegaMenuPortal = ({ items, parentRect }: { items: NavItem[], parentRect: DOMRect }) => {
+      // Mega Menu spans widely. We position it aligned to the left of the parent, but max-width constrained.
+      const style: React.CSSProperties = {
+          top: parentRect.bottom + 4,
+          left: Math.max(20, parentRect.left - 200), // Shift left slightly to center-ish or align
+          position: 'fixed',
+          zIndex: 9999,
+          maxHeight: '80vh',
+          overflowY: 'auto'
+      };
+
+      return createPortal(
+          <div 
+             style={style} 
+             className={`
+                p-6 grid grid-cols-3 gap-8 w-[900px] max-w-[95vw]
+                rounded-md border shadow-2xl
+                animate-in fade-in zoom-in-95 duration-100
+                ${getDropdownColors()}
+             `}
+             onMouseEnter={() => { /* Keep open logic handled by parent state usually, but Portal requires careful mouse tracking */ }}
+          >
+             {items.map(colRoot => (
+                <div key={colRoot.id}>
+                    <MegaMenuNode item={colRoot} depth={0} />
+                </div>
+             ))}
+          </div>,
+          document.body
       );
   };
 
-  const HeaderItem = ({ item, depth = 0 }: { item: NavItem; depth?: number }) => {
+
+  // --- CASCADING MENU (Portal Based) ---
+  const CascadingMenuPortal = ({ items, depth, parentRect, onClose }: { items: NavItem[], depth: number, parentRect: DOMRect, onClose: () => void }) => {
+      const isRoot = depth === 0;
+      
+      // Position Logic
+      // Root: Top = Bottom of Parent, Left = Left of Parent
+      // Nested: Top = Top of Parent, Left = Right of Parent
+      
+      const top = isRoot ? parentRect.bottom + 2 : parentRect.top;
+      const left = isRoot ? parentRect.left : parentRect.right - 4; // -4 overlap for safety
+
+      // Fix off-screen logic (Basic)
+      const screenW = window.innerWidth;
+      const width = 220;
+      const finalLeft = (left + width > screenW) ? (parentRect.left - width) : left;
+
+      const style: React.CSSProperties = {
+          top: top,
+          left: finalLeft,
+          position: 'fixed',
+          zIndex: 9999 + depth,
+      };
+
+      return createPortal(
+        <ul 
+          style={style}
+          className={`
+            min-w-[220px] rounded-md border py-1 shadow-xl
+            animate-in fade-in zoom-in-95 duration-75
+            ${getDropdownColors()}
+          `}
+          onMouseLeave={onClose} // Basic close trigger, usually handled by parent Hover but Portals break nesting
+        >
+            {/* Safe Bridge for Diagonal Movement */}
+            {!isRoot && (
+                <div 
+                    className="absolute -left-4 top-0 w-4 h-full bg-transparent"
+                    style={{ left: left === finalLeft ? '-10px' : '100%' }} // Adjust based on side
+                />
+            )}
+
+            {items.map(item => (
+                <HeaderItemPortalWrapper key={item.id} item={item} depth={depth + 1} />
+            ))}
+        </ul>,
+        document.body
+      );
+  };
+
+  // Wrapper to handle Hover state for Portal generation
+  const HeaderItemPortalWrapper: React.FC<{ item: NavItem, depth: number }> = ({ item, depth }) => {
+      const [isHovered, setIsHovered] = useState(false);
+      const [rect, setRect] = useState<DOMRect | null>(null);
+      const ref = useRef<HTMLLIElement>(null);
+      const hasChildren = item.children && item.children.length > 0;
+      const isActive = activeId === item.id;
+      
+      const handleEnter = (e: React.MouseEvent) => {
+          if(ref.current) {
+              setRect(ref.current.getBoundingClientRect());
+          }
+          setIsHovered(true);
+      };
+
+      const handleLeave = () => {
+          setIsHovered(false);
+      };
+
+      return (
+          <li 
+            ref={ref}
+            onMouseEnter={handleEnter}
+            onMouseLeave={handleLeave}
+            className="relative list-none"
+          >
+              <button
+                onClick={() => handleLinkClick(item)}
+                className={`
+                    w-full flex items-center justify-between px-4 py-2.5 text-sm
+                    ${getHoverColors()}
+                    ${isActive && !hasChildren ? getActiveColors() : ''}
+                `}
+              >
+                  <div className="flex items-center gap-2">
+                    {/* Only show icon for deeper levels if needed, or keep clean */}
+                    {depth === 1 && item.icon && <item.icon size={16} className="opacity-70" />} 
+                    <span>{item.label}</span>
+                  </div>
+                  {hasChildren && <ChevronRight size={14} className="opacity-50" />}
+              </button>
+
+              {hasChildren && isHovered && rect && (
+                  <CascadingMenuPortal 
+                    items={item.children!} 
+                    depth={depth} 
+                    parentRect={rect} 
+                    onClose={() => setIsHovered(false)}
+                  />
+              )}
+          </li>
+      )
+  };
+
+
+  const HeaderItem: React.FC<{ item: NavItem }> = ({ item }) => {
+    const [isHovered, setIsHovered] = useState(false);
+    const [rect, setRect] = useState<DOMRect | null>(null);
+    const ref = useRef<HTMLLIElement>(null);
+    
     const hasChildren = item.children && item.children.length > 0;
-    const isRoot = depth === 0;
     const isActive = activeId === item.id;
 
-    // Decide dropdown type
-    const useMegaMenu = navConfig.headerDropdownMode === HeaderDropdownMode.MEGA && isRoot && hasChildren;
-    
+    // Config Check
+    const useMegaMenu = navConfig.headerDropdownMode === HeaderDropdownMode.MEGA && hasChildren;
+
+    const handleMouseEnter = () => {
+        if(ref.current) setRect(ref.current.getBoundingClientRect());
+        setIsHovered(true);
+    };
+
     return (
-        <li className={`relative group list-none ${isRoot ? 'h-full flex items-center' : ''}`}>
+        <li 
+            ref={ref}
+            className={`relative h-full flex items-center`}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={() => setIsHovered(false)}
+        >
             <button
                 onClick={() => handleLinkClick(item)}
                 className={`
                     flex items-center justify-between gap-2 whitespace-nowrap transition-colors
-                    ${isRoot ? 'px-4 py-2 rounded-md text-sm font-medium' : 'w-full px-4 py-3 text-sm'}
+                    px-4 py-2 rounded-md text-sm font-medium
                     ${getHoverColors()}
                     ${isActive && !hasChildren ? getActiveColors() : ''}
                 `}
             >
                 <div className="flex items-center gap-2">
-                    {(!isRoot || item.icon) && (
-                         <item.icon size={18} className={isRoot ? '' : 'opacity-70 scale-90'} />
-                    )}
-                    <span>{item.label}</span>
+                     <item.icon size={18} />
+                     <span>{item.label}</span>
                 </div>
                 {hasChildren && (
-                    isRoot
-                        ? <ChevronDown size={14} className="opacity-70 group-hover:rotate-180 transition-transform duration-200" />
-                        : <ChevronRight size={14} className="opacity-70" />
+                    <ChevronDown size={14} className={`opacity-70 transition-transform duration-200 ${isHovered ? 'rotate-180' : ''}`} />
                 )}
             </button>
 
-            {hasChildren && (
+            {/* DROPDOWN CONTENT (Portal) */}
+            {hasChildren && isHovered && rect && (
                 useMegaMenu 
-                ? <HeaderMegaMenu items={item.children!} />
-                : <HeaderCascadingMenu items={item.children!} depth={depth} />
+                ? <HeaderMegaMenuPortal items={item.children!} parentRect={rect} />
+                : <CascadingMenuPortal items={item.children!} depth={0} parentRect={rect} onClose={() => setIsHovered(false)} />
             )}
         </li>
     );
@@ -211,7 +337,6 @@ export const Navigation: React.FC = () => {
                             path: '#',
                             children: moreItems
                         }} 
-                        depth={0} 
                     />
                 )}
             </ul>
@@ -225,8 +350,7 @@ export const Navigation: React.FC = () => {
 
   // Helper for Fixed Flyout
   const FlyoutContainer = ({ items, depth, parentRect }: { items: NavItem[], depth: number, parentRect: DOMRect }) => {
-      // Calculate top position. If it goes off screen bottom, shift up.
-      // Basic implementation: Align top.
+      // Calculate top position.
       const style: React.CSSProperties = {
           top: parentRect.top,
           left: parentRect.right,
@@ -234,26 +358,22 @@ export const Navigation: React.FC = () => {
           zIndex: 9999,
       };
 
-      return (
+      return createPortal(
           <div style={style} className={`ml-2 min-w-[200px] rounded-md border py-1 shadow-xl ${getDropdownColors()}`}>
               {/* Invisible bridge to allow mouse travel */}
-               <div className="absolute -left-2 top-0 w-4 h-full bg-transparent" />
+               <div className="absolute -left-4 top-0 w-6 h-full bg-transparent" />
               {items.map(item => <SidebarItem key={item.id} item={item} depth={depth} isFlyoutContext={true} />)}
-          </div>
+          </div>,
+          document.body
       );
   };
 
-  const SidebarItem = ({ item, depth = 0, isFlyoutContext = false }: { item: NavItem; depth?: number; isFlyoutContext?: boolean }) => {
+  const SidebarItem: React.FC<{ item: NavItem; depth?: number; isFlyoutContext?: boolean }> = ({ item, depth = 0, isFlyoutContext = false }) => {
     const hasChildren = item.children && item.children.length > 0;
     const isExpanded = expandedItems.includes(item.id);
     const isActive = activeId === item.id;
     const isCollapsed = sidebarStyle === SidebarStyle.COLLAPSED;
 
-    // DETERMINE BEHAVIOR
-    // 1. If we are already in a flyout context, children MUST be flyouts (infinite nesting right).
-    // 2. If Sidebar is collapsed, Root items are buttons that trigger Flyout.
-    // 3. Otherwise, check config. 
-    
     let useFlyout = false;
 
     if (isFlyoutContext) {
@@ -261,8 +381,6 @@ export const Navigation: React.FC = () => {
     } else if (isCollapsed && depth === 0) {
         useFlyout = true;
     } else {
-        // Check Hybrid Config
-        // e.g. Trigger Depth = 1. Level 0 is Accordion. Level 1+ is Flyout.
         if (navConfig.sidebarExpansionMode === SidebarExpansionMode.FLYOUT) {
             useFlyout = true;
         } else if (navConfig.sidebarExpansionMode === SidebarExpansionMode.HYBRID) {
@@ -319,7 +437,6 @@ export const Navigation: React.FC = () => {
           <div className={`flex items-center gap-3 w-full ${(isCollapsed && !isFlyoutContext) ? 'justify-center' : ''}`}>
              <item.icon size={(isCollapsed && !isFlyoutContext) ? 22 : 18} className="shrink-0" />
              
-             {/* Text Label */}
              {(!isCollapsed || isFlyoutContext) && (
                 <>
                   <span className="flex-1 text-left truncate">{item.label}</span>
