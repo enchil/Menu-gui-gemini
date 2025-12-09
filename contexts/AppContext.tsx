@@ -20,6 +20,8 @@ interface AppContextProps {
   setIsMobileMenuOpen: (isOpen: boolean) => void;
   navConfig: NavConfig;
   setNavConfig: (config: NavConfig | ((prev: NavConfig) => NavConfig)) => void;
+  activePath: string;
+  setActivePath: (path: string) => void;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -29,6 +31,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [layoutMode, setLayoutMode] = useState<LayoutMode>(LayoutMode.SIDEBAR);
   const [sidebarStyle, setSidebarStyle] = useState<SidebarStyle>(SidebarStyle.EXPANDED);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [activePath, setActivePath] = useState<string>('/overview');
 
   // Default Advanced Configuration
   const [navConfig, setNavConfig] = useState<NavConfig>({
@@ -67,7 +70,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isMobileMenuOpen,
         setIsMobileMenuOpen,
         navConfig,
-        setNavConfig
+        setNavConfig,
+        activePath,
+        setActivePath
       }}
     >
       {children}

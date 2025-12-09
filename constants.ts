@@ -21,7 +21,13 @@ import {
   MoreHorizontal,
   Server,
   Database,
-  Network
+  Network,
+  CloudDownload,
+  Monitor,
+  Smartphone,
+  Terminal,
+  Wrench,
+  Package
 } from 'lucide-react';
 import { NavItem } from './types';
 
@@ -35,6 +41,26 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Overview',
     icon: LayoutDashboard,
     path: '/overview',
+  },
+  {
+    id: 'update-service',
+    label: 'Update Service',
+    icon: CloudDownload,
+    path: '/update-service',
+    children: [
+      {
+        id: 'release-mgmt',
+        label: 'Release Management',
+        icon: Package,
+        path: '/update-service/release'
+      },
+      {
+        id: 'update-tools',
+        label: 'Tools & Utilities',
+        icon: Wrench,
+        path: '/update-service/tools'
+      }
+    ]
   },
   {
     id: 'users',
@@ -118,12 +144,6 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Peripheral Mgmt',
     icon: Cpu,
     path: '/peripheral'
-  },
-  {
-    id: 'update',
-    label: 'Update Center',
-    icon: RefreshCw,
-    path: '/update'
   },
   {
     id: 'spotlight',

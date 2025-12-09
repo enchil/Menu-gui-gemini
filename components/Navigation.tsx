@@ -21,11 +21,12 @@ export const Navigation: React.FC = () => {
     setSidebarStyle,
     isMobileMenuOpen,
     setIsMobileMenuOpen,
-    navConfig
+    navConfig,
+    activePath,
+    setActivePath
   } = useApp();
 
-  const [expandedItems, setExpandedItems] = useState<string[]>(['users', 'settings']);
-  const [activeId, setActiveId] = useState<string>('overview');
+  const [expandedItems, setExpandedItems] = useState<string[]>(['users', 'settings', 'agent-hub', 'agent-os']);
 
   // --- Helpers ---
   const getNavColors = () => {
@@ -66,9 +67,14 @@ export const Navigation: React.FC = () => {
 
   const handleLinkClick = (item: NavItem) => {
     if (!item.children || item.children.length === 0) {
-      setActiveId(item.id);
+      setActivePath(item.path);
       if (layoutMode === LayoutMode.SIDEBAR && window.innerWidth < 1024) setIsMobileMenuOpen(false);
     }
+  };
+
+  // Check if item is active (simple path check)
+  const isItemActive = (item: NavItem) => {
+     return activePath === item.path;
   };
 
   // ==========================================
@@ -161,10 +167,6 @@ export const Navigation: React.FC = () => {
   const CascadingMenuPortal = ({ items, depth, parentRect, onClose }: { items: NavItem[], depth: number, parentRect: DOMRect, onClose: () => void }) => {
       const isRoot = depth === 0;
       
-      // Position Logic
-      // Root: Top = Bottom of Parent, Left = Left of Parent
-      // Nested: Top = Top of Parent, Left = Right of Parent
-      
       const top = isRoot ? parentRect.bottom + 2 : parentRect.top;
       const left = isRoot ? parentRect.left : parentRect.right - 4; // -4 overlap for safety
 
@@ -188,7 +190,7 @@ export const Navigation: React.FC = () => {
             animate-in fade-in zoom-in-95 duration-75
             ${getDropdownColors()}
           `}
-          onMouseLeave={onClose} // Basic close trigger, usually handled by parent Hover but Portals break nesting
+          onMouseLeave={onClose} 
         >
             {/* Safe Bridge for Diagonal Movement */}
             {!isRoot && (
@@ -212,7 +214,7 @@ export const Navigation: React.FC = () => {
       const [rect, setRect] = useState<DOMRect | null>(null);
       const ref = useRef<HTMLLIElement>(null);
       const hasChildren = item.children && item.children.length > 0;
-      const isActive = activeId === item.id;
+      const isActive = isItemActive(item);
       
       const handleEnter = (e: React.MouseEvent) => {
           if(ref.current) {
@@ -267,7 +269,7 @@ export const Navigation: React.FC = () => {
     const ref = useRef<HTMLLIElement>(null);
     
     const hasChildren = item.children && item.children.length > 0;
-    const isActive = activeId === item.id;
+    const isActive = isItemActive(item);
 
     // Config Check
     const useMegaMenu = navConfig.headerDropdownMode === HeaderDropdownMode.MEGA && hasChildren;
@@ -371,7 +373,7 @@ export const Navigation: React.FC = () => {
   const SidebarItem: React.FC<{ item: NavItem; depth?: number; isFlyoutContext?: boolean }> = ({ item, depth = 0, isFlyoutContext = false }) => {
     const hasChildren = item.children && item.children.length > 0;
     const isExpanded = expandedItems.includes(item.id);
-    const isActive = activeId === item.id;
+    const isActive = isItemActive(item);
     const isCollapsed = sidebarStyle === SidebarStyle.COLLAPSED;
 
     let useFlyout = false;

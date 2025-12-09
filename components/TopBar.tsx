@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../contexts/AppContext';
+import { NAV_ITEMS } from '../constants';
+import { NavItem } from '../types';
 import { 
   AppTheme, 
   LayoutMode, 
@@ -8,18 +10,32 @@ import {
   HeaderDropdownMode 
 } from '../types';
 import { 
-  Bell, 
-  Search, 
   Menu, 
-  User, 
-  Monitor, 
   Sun, 
   Moon, 
+  Monitor, 
   LayoutTemplate,
   Sidebar as SidebarIcon,
   Settings2,
-  X
+  X,
+  ChevronRight
 } from 'lucide-react';
+
+// Helper to find the breadcrumb path recursively
+const findBreadcrumbPath = (items: NavItem[], targetPath: string): NavItem[] => {
+  for (const item of items) {
+    if (item.path === targetPath) {
+      return [item];
+    }
+    if (item.children) {
+      const childPath = findBreadcrumbPath(item.children, targetPath);
+      if (childPath.length > 0) {
+        return [item, ...childPath];
+      }
+    }
+  }
+  return [];
+};
 
 export const TopBar: React.FC = () => {
   const { 
@@ -29,10 +45,22 @@ export const TopBar: React.FC = () => {
     setLayoutMode, 
     setIsMobileMenuOpen,
     navConfig,
-    setNavConfig
+    setNavConfig,
+    activePath
   } = useApp();
 
   const [showConfig, setShowConfig] = useState(false);
+
+  // Calculate breadcrumbs based on activePath
+  const breadcrumbs = useMemo(() => {
+    const path = findBreadcrumbPath(NAV_ITEMS, activePath);
+    // Fallback if path not found (e.g. initial load or unknown route)
+    if (path.length === 0 && activePath === '/overview') {
+        const overview = NAV_ITEMS.find(i => i.id === 'overview');
+        return overview ? [overview] : [];
+    }
+    return path;
+  }, [activePath]);
 
   const getThemeStyles = () => {
     switch(theme) {
@@ -41,14 +69,18 @@ export const TopBar: React.FC = () => {
           bar: 'bg-[#282a36] border-b border-[#44475a] text-gray-200',
           input: 'bg-[#44475a] text-white placeholder-gray-400 border-none focus:ring-[#bd93f9]',
           icon: 'text-[#bd93f9] hover:bg-[#44475a]',
-          panel: 'bg-[#282a36] border-[#44475a] text-gray-200'
+          panel: 'bg-[#282a36] border-[#44475a] text-gray-200',
+          crumbActive: 'text-[#bd93f9]',
+          crumbInactive: 'text-gray-400 hover:text-[#f8f8f2]'
         };
       case AppTheme.LIGHT:
         return {
           bar: 'bg-white border-b border-gray-200 text-slate-800',
           input: 'bg-gray-100 text-slate-800 placeholder-slate-500 border-transparent focus:bg-white focus:ring-blue-500 focus:border-blue-500',
           icon: 'text-slate-500 hover:bg-gray-100 hover:text-blue-600',
-          panel: 'bg-white border-gray-200 text-slate-800'
+          panel: 'bg-white border-gray-200 text-slate-800',
+          crumbActive: 'text-blue-600',
+          crumbInactive: 'text-slate-500 hover:text-slate-800'
         };
       case AppTheme.DARK:
       default:
@@ -56,7 +88,9 @@ export const TopBar: React.FC = () => {
           bar: 'bg-slate-900 border-b border-slate-800 text-gray-200',
           input: 'bg-slate-800 text-gray-200 placeholder-slate-500 border-transparent focus:ring-blue-500',
           icon: 'text-gray-400 hover:bg-slate-800 hover:text-white',
-          panel: 'bg-slate-900 border-slate-700 text-gray-200'
+          panel: 'bg-slate-900 border-slate-700 text-gray-200',
+          crumbActive: 'text-blue-400',
+          crumbInactive: 'text-gray-400 hover:text-gray-200'
         };
     }
   };
@@ -76,32 +110,30 @@ export const TopBar: React.FC = () => {
             </button>
         )}
         
-        {/* Breadcrumb Area */}
-        <div className="hidden md:flex items-center gap-2 text-sm font-medium opacity-80">
-          <span>Device Management</span>
-          <span className="opacity-50">/</span>
-          <span className={theme === AppTheme.LIGHT ? 'text-blue-600' : 'text-blue-400'}>Device List</span>
-        </div>
+        {/* Dynamic Breadcrumb Area */}
+        <nav className="hidden md:flex items-center text-sm font-medium">
+          {breadcrumbs.map((item, index) => {
+            const isLast = index === breadcrumbs.length - 1;
+            return (
+              <div key={item.id} className="flex items-center">
+                {index > 0 && (
+                   <ChevronRight size={14} className="mx-2 opacity-40" />
+                )}
+                <span 
+                    className={`
+                        transition-colors 
+                        ${isLast ? `font-bold ${styles.crumbActive}` : `opacity-70 ${styles.crumbInactive}`}
+                    `}
+                >
+                  {item.label}
+                </span>
+              </div>
+            );
+          })}
+        </nav>
       </div>
 
-      {/* Global Search */}
-      <div className="hidden md:flex relative max-w-md w-full mx-4">
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <Search size={16} className="opacity-50" />
-        </div>
-        <input 
-          type="text" 
-          placeholder="Global Search (Ctrl + K)" 
-          className={`
-            block w-full pl-10 pr-3 py-1.5 
-            text-sm rounded-md transition-all
-            focus:outline-none focus:ring-2 
-            ${styles.input}
-          `}
-        />
-      </div>
-
-      {/* Actions */}
+      {/* Actions (Search Removed) */}
       <div className="flex items-center gap-2">
         
         {/* Config Toggle */}

@@ -3,10 +3,11 @@ import { AppProvider, useApp } from './contexts/AppContext';
 import { Navigation } from './components/Navigation';
 import { TopBar } from './components/TopBar';
 import { DataTable } from './components/DataTable';
+import { AgentHub } from './components/AgentHub';
 import { AppTheme, LayoutMode } from './types';
 
 const MainLayout: React.FC = () => {
-  const { theme, layoutMode } = useApp();
+  const { theme, layoutMode, activePath } = useApp();
 
   // Root Background Strategy
   const getRootBackground = () => {
@@ -19,6 +20,15 @@ const MainLayout: React.FC = () => {
       default:
         return 'bg-[#0f172a] text-slate-100'; // Slate-950/900 mix
     }
+  };
+
+  // Simple Router
+  const renderContent = () => {
+    if (activePath.startsWith('/update-service')) {
+      return <AgentHub />;
+    }
+    // Default to Dashboard/Overview
+    return <DataTable />;
   };
 
   return (
@@ -36,11 +46,7 @@ const MainLayout: React.FC = () => {
         {/* Scrollable Content */}
         <main className="flex-1 overflow-y-auto p-4 md:p-8">
             <div className="max-w-7xl mx-auto w-full">
-                {/* 
-                  Dynamic Content Injection would go here.
-                  For this demo, we render the Device List directly.
-                */}
-                <DataTable />
+                {renderContent()}
             </div>
         </main>
 
