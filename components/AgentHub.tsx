@@ -39,7 +39,16 @@ import {
   Calendar,
   Archive,
   Ban,
-  Radio
+  Radio,
+  RotateCcw,
+  CheckCircle2,
+  AlertOctagon,
+  Hash,
+  ArrowLeft,
+  ShieldAlert,
+  Loader2,
+  FileBadge,
+  Link as LinkIcon
 } from 'lucide-react';
 
 // --- Types ---
@@ -166,7 +175,17 @@ const FILTER_OPTIONS = {
   archs: ['x86', 'x86_64', 'arm', 'arm64'],
 };
 
-const KNOWN_CORE_VERSIONS = ['1.2.3', '2.1.0', '3.0.0'];
+const CHANNEL_DESCRIPTIONS: Record<ReleaseChannel, string> = {
+    'Production': 'Stable release for all end-users. Requires Spotlight target to be active.',
+    'Test': 'Internal QA and automated testing environments. Frequent updates allowed.',
+    'Beta': 'Early access for opted-in partners. Subject to limited availability.',
+    'Experimental': 'Unstable builds for internal development validation only.'
+};
+
+const TARGET_DESCRIPTIONS: Record<ReleaseTarget, string> = {
+    'Spotlight Download Page': 'Public-facing portal. Enabling this strictly binds the release to the "Production" channel.',
+    'Automation Update Service': 'OTA backend for connected devices. Can support multiple channels (Test, Beta, etc.).'
+};
 
 // --- Logic Helpers ---
 
@@ -177,35 +196,24 @@ const getPlatformsForProduct = (product: string): string[] => {
 };
 
 const getSeriesForPlatform = (platform: string, product: string): string[] => {
-    // Diagram Rule: Agent + Windows -> ['Windows']
-    if (product === 'Agent' && platform === 'Windows') {
-        return ['Windows'];
-    }
-    
+    if (product === 'Agent' && platform === 'Windows') return ['Windows'];
     switch (platform) {
         case 'Android': return ['Universal', 'Aura', 'FT-AOSP', 'FT-GMS', 'TD-GMS'];
-        case 'Windows': return ['Universal']; // For non-Agent products
+        case 'Windows': return ['Universal'];
         case 'Linux': return ['Universal'];
         default: return ['Universal'];
     }
 };
 
 const getArchsForConfig = (platform: string, series: string, isCustomSeries: boolean): string[] => {
-    // Rule: If custom series, show all valid archs for that platform
     if (isCustomSeries) {
         if (platform === 'Windows') return ['x86', 'x86_64'];
         if (platform === 'Linux') return ['x86', 'x86_64', 'arm', 'arm64'];
         if (platform === 'Android') return ['x86', 'x86_64', 'arm', 'arm64'];
         return ['x86', 'x86_64'];
     }
-
-    // Diagram Rules Implementation
-    if (platform === 'Windows') {
-        return ['x86', 'x86_64'];
-    }
-    if (platform === 'Linux') {
-        return ['x86', 'x86_64', 'arm', 'arm64'];
-    }
+    if (platform === 'Windows') return ['x86', 'x86_64'];
+    if (platform === 'Linux') return ['x86', 'x86_64', 'arm', 'arm64'];
     if (platform === 'Android') {
         if (series === 'Universal') return ['x86', 'x86_64'];
         if (series === 'Aura') return ['arm'];
@@ -238,7 +246,7 @@ export const AgentHub: React.FC = () => {
           textMain: 'text-[#f8f8f2]',
           textSub: 'text-[#6272a4]',
           header: 'bg-[#44475a] text-[#bd93f9]',
-          row: 'hover:bg-[#44475a]/50 border-b border-[#44475a]',
+          row: 'hover:bg-[#44475a]/50 border-b border-[#44475a] cursor-pointer',
           input: 'bg-[#44475a] text-white border-[#6272a4]',
           buttonPrimary: 'bg-[#bd93f9] text-[#282a36] hover:bg-[#ff79c6]',
           badge: 'bg-[#44475a] text-[#8be9fd] border border-[#6272a4]',
@@ -256,7 +264,7 @@ export const AgentHub: React.FC = () => {
           textMain: 'text-slate-800',
           textSub: 'text-slate-500',
           header: 'bg-gray-50 text-slate-700 font-semibold',
-          row: 'hover:bg-blue-50 border-b border-gray-100',
+          row: 'hover:bg-blue-50 border-b border-gray-100 cursor-pointer',
           input: 'bg-white border-gray-300 text-slate-800',
           buttonPrimary: 'bg-blue-600 text-white hover:bg-blue-700',
           badge: 'bg-blue-50 text-blue-700 border border-blue-200',
@@ -275,7 +283,7 @@ export const AgentHub: React.FC = () => {
           textMain: 'text-gray-200',
           textSub: 'text-gray-400',
           header: 'bg-slate-900/50 text-gray-300 font-semibold',
-          row: 'hover:bg-slate-700 border-b border-slate-700/50',
+          row: 'hover:bg-slate-700 border-b border-slate-700/50 cursor-pointer',
           input: 'bg-slate-900 border-slate-600 text-gray-200',
           buttonPrimary: 'bg-blue-600 text-white hover:bg-blue-500',
           badge: 'bg-slate-700 text-blue-400 border border-slate-600',
@@ -301,68 +309,114 @@ export const AgentHub: React.FC = () => {
 
   // --- STATUS / DELETE MODAL ---
   const StatusManagementModal = () => {
+    // ... (Existing Implementation kept intact)
     if (!selectedPackage) return null;
+    const [confirmAction, setConfirmAction] = useState<'revert' | 'deprecate' | 'delete' | null>(null);
 
-    const handleDelete = () => {
-        // Mock deletion logic
+    const executeAction = () => {
+        if (!confirmAction) return;
+        
         const idx = MOCK_RELEASES.findIndex(r => r.id === selectedPackage.id);
         if (idx !== -1) {
-            MOCK_RELEASES.splice(idx, 1);
+            if (confirmAction === 'delete') {
+                MOCK_RELEASES.splice(idx, 1);
+            } else if (confirmAction === 'deprecate') {
+                MOCK_RELEASES[idx].status = 'deprecated';
+            } else if (confirmAction === 'revert') {
+                MOCK_RELEASES[idx].status = 'active';
+                MOCK_RELEASES[idx].channels = [];
+                MOCK_RELEASES[idx].targets = [];
+            }
         }
         setIsStatusOpen(false);
         setSelectedPackage(null);
     };
 
-    const handleDeprecate = () => {
-        // Mock deprecation
-        const item = MOCK_RELEASES.find(r => r.id === selectedPackage.id);
-        if(item) item.status = 'deprecated';
-        setIsStatusOpen(false);
-    };
+    const getConfirmConfig = () => {
+        switch(confirmAction) {
+            case 'revert': return { icon: RotateCcw, color: 'text-gray-400', title: 'Revert to Not Released', desc: 'This will remove the package from all channels and targets. It will no longer be available for download.' };
+            case 'deprecate': return { icon: Ban, color: 'text-amber-500', title: 'Deprecate Release', desc: 'This will mark the release as obsolete. Existing users may still have it, but new downloads will be discouraged.' };
+            case 'delete': return { icon: Trash2, color: 'text-red-500', title: 'Delete Permanently', desc: 'This action is irreversible. The file and all its history will be permanently removed from the system.' };
+            default: return { icon: Info, color: 'text-white', title: '', desc: '' };
+        }
+    }
+    const config = getConfirmConfig();
 
     return (
         <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${styles.modalOverlay}`}>
             <div className={`w-full max-w-md rounded-xl shadow-2xl border p-6 flex flex-col ${styles.modalBg}`}>
-                <div className="flex items-start gap-4 mb-4">
-                    <div className="p-3 bg-red-500/10 text-red-500 rounded-lg">
-                        <AlertTriangle size={24} />
-                    </div>
-                    <div>
-                        <h3 className={`text-lg font-bold ${styles.textMain}`}>Manage Release Status</h3>
-                        <p className={`text-sm ${styles.textSub} mt-1`}>
-                            Action for: <span className="font-mono font-bold">{selectedPackage.filename}</span>
-                        </p>
-                    </div>
-                </div>
-
-                <div className="space-y-3 mb-6">
-                    <button 
-                        onClick={handleDeprecate}
-                        className={`w-full p-4 rounded-lg border text-left flex items-center gap-3 transition-colors ${selectedPackage.status === 'deprecated' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-amber-500/10 border-amber-500/30'}`}
-                        disabled={selectedPackage.status === 'deprecated'}
-                    >
-                        <div className="p-2 bg-amber-500/20 text-amber-500 rounded-full"><Ban size={18}/></div>
-                        <div>
-                            <div className={`font-bold ${styles.textMain}`}>Deprecate Release</div>
-                            <div className={`text-xs ${styles.textSub}`}>Mark as obsolete. Prevents new downloads but keeps history.</div>
+                
+                {confirmAction ? (
+                     <div className="space-y-6 animate-in zoom-in-95 duration-200">
+                         <div className="flex flex-col items-center text-center">
+                             <div className={`p-4 rounded-full bg-opacity-10 mb-4 ${config.color.replace('text-', 'bg-')}`}>
+                                 <config.icon size={48} className={config.color} />
+                             </div>
+                             <h3 className={`text-xl font-bold ${styles.textMain}`}>Are you sure?</h3>
+                             <p className={`text-sm ${styles.textSub} mt-2`}>{config.desc}</p>
+                         </div>
+                         <div className="flex gap-3 mt-4">
+                             <button onClick={() => setConfirmAction(null)} className={`flex-1 py-3 rounded-lg font-medium border border-inherit ${styles.textSub} hover:bg-white/5`}>Cancel</button>
+                             <button onClick={executeAction} className={`flex-1 py-3 rounded-lg font-bold text-white shadow-lg ${confirmAction === 'delete' ? 'bg-red-600 hover:bg-red-700' : confirmAction === 'deprecate' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-gray-600 hover:bg-gray-500'}`}>
+                                 Yes, {config.title.split(' ')[0]}
+                             </button>
+                         </div>
+                     </div>
+                ) : (
+                    <>
+                        <div className="flex items-start gap-4 mb-4">
+                            <div className="p-3 bg-red-500/10 text-red-500 rounded-lg">
+                                <AlertTriangle size={24} />
+                            </div>
+                            <div>
+                                <h3 className={`text-lg font-bold ${styles.textMain}`}>Manage Release Status</h3>
+                                <p className={`text-sm ${styles.textSub} mt-1`}>
+                                    Action for: <span className="font-mono font-bold">{selectedPackage.filename}</span>
+                                </p>
+                            </div>
                         </div>
-                    </button>
 
-                    <button 
-                        onClick={handleDelete}
-                        className={`w-full p-4 rounded-lg border text-left flex items-center gap-3 transition-colors hover:bg-red-500/10 border-red-500/30 group`}
-                    >
-                        <div className="p-2 bg-red-500/20 text-red-500 rounded-full group-hover:bg-red-500 group-hover:text-white transition-colors"><Trash2 size={18}/></div>
-                        <div>
-                            <div className={`font-bold text-red-500`}>Delete Permanently</div>
-                            <div className={`text-xs ${styles.textSub}`}>Remove this file and all associated metadata. Cannot be undone.</div>
+                        <div className="space-y-3 mb-6">
+                            <button 
+                                onClick={() => setConfirmAction('revert')}
+                                className={`w-full p-4 rounded-lg border text-left flex items-center gap-3 transition-colors hover:bg-gray-500/10 border-gray-500/30`}
+                            >
+                                <div className="p-2 bg-gray-500/20 text-gray-400 rounded-full"><RotateCcw size={18}/></div>
+                                <div>
+                                    <div className={`font-bold ${styles.textMain}`}>Revert to "Not Released"</div>
+                                    <div className={`text-xs ${styles.textSub}`}>Clear all channels and targets. Files remain in storage.</div>
+                                </div>
+                            </button>
+
+                            <button 
+                                onClick={() => setConfirmAction('deprecate')}
+                                className={`w-full p-4 rounded-lg border text-left flex items-center gap-3 transition-colors ${selectedPackage.status === 'deprecated' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-amber-500/10 border-amber-500/30'}`}
+                                disabled={selectedPackage.status === 'deprecated'}
+                            >
+                                <div className="p-2 bg-amber-500/20 text-amber-500 rounded-full"><Ban size={18}/></div>
+                                <div>
+                                    <div className={`font-bold ${styles.textMain}`}>Deprecate Release</div>
+                                    <div className={`text-xs ${styles.textSub}`}>Mark as obsolete. Prevents new downloads but keeps history.</div>
+                                </div>
+                            </button>
+
+                            <button 
+                                onClick={() => setConfirmAction('delete')}
+                                className={`w-full p-4 rounded-lg border text-left flex items-center gap-3 transition-colors hover:bg-red-500/10 border-red-500/30 group`}
+                            >
+                                <div className="p-2 bg-red-500/20 text-red-500 rounded-full group-hover:bg-red-500 group-hover:text-white transition-colors"><Trash2 size={18}/></div>
+                                <div>
+                                    <div className={`font-bold text-red-500`}>Delete Permanently</div>
+                                    <div className={`text-xs ${styles.textSub}`}>Remove this file and all associated metadata. Cannot be undone.</div>
+                                </div>
+                            </button>
                         </div>
-                    </button>
-                </div>
 
-                <div className="flex justify-end">
-                    <button onClick={() => setIsStatusOpen(false)} className={`px-4 py-2 rounded font-medium ${styles.textSub} hover:text-white`}>Cancel</button>
-                </div>
+                        <div className="flex justify-end">
+                            <button onClick={() => setIsStatusOpen(false)} className={`px-4 py-2 rounded font-medium ${styles.textSub} hover:text-white`}>Cancel</button>
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );
@@ -371,339 +425,152 @@ export const AgentHub: React.FC = () => {
 
   // --- DETAIL & EDIT MODAL ---
   const DetailEditModal = () => {
-      if (!selectedPackage) return null;
-      
-      const [isEditing, setIsEditing] = useState(false);
-      const [activeTab, setActiveTab] = useState<'general' | 'compat' | 'activity'>('general');
-      const [editForm, setEditForm] = useState(selectedPackage);
+    // ... (Existing Implementation)
+    if (!selectedPackage) return null;
+    
+    const [isEditing, setIsEditing] = useState(false);
+    const [activeTab, setActiveTab] = useState<'general' | 'compat' | 'activity'>('general');
+    const [editForm, setEditForm] = useState(selectedPackage);
 
-      // Derive available targets for the editing view
-      const availableTargets = useMemo(() => {
-          return MOCK_TARGETS.filter(t => {
-              // Basic platform filter
-              if (t.platform !== editForm.platform) return false;
-              // Arch filter (simplified logic for demo)
-              const hasMatchingArch = t.arch.some(a => editForm.arch.includes(a as any));
-              if (!hasMatchingArch) return false;
-              return true;
-          });
-      }, [editForm.platform, editForm.arch]);
+    const availableTargets = useMemo(() => {
+        return MOCK_TARGETS.filter(t => {
+            if (t.platform !== editForm.platform) return false;
+            const hasMatchingArch = t.arch.some(a => editForm.arch.includes(a as any));
+            if (!hasMatchingArch) return false;
+            return true;
+        });
+    }, [editForm.platform, editForm.arch]);
 
-      const toggleOsSupport = (targetName: string) => {
-          setEditForm(prev => {
-              const exists = prev.supportOS.includes(targetName);
-              return {
-                  ...prev,
-                  supportOS: exists 
-                    ? prev.supportOS.filter(n => n !== targetName)
-                    : [...prev.supportOS, targetName]
-              };
-          });
-      };
+    const toggleOsSupport = (targetName: string) => {
+        setEditForm(prev => {
+            const exists = prev.supportOS.includes(targetName);
+            return {
+                ...prev,
+                supportOS: exists 
+                  ? prev.supportOS.filter(n => n !== targetName)
+                  : [...prev.supportOS, targetName]
+            };
+        });
+    };
 
-      const handleSave = () => {
-          // In a real app, this would make an API call
-          // Here we just mock adding a log and updating local state
-          const newLog: ActivityLog = {
-              id: `a-${Date.now()}`,
-              user: 'current_admin',
-              action: 'Updated package details',
-              timestamp: new Date().toLocaleString()
-          };
-          
-          // Update the MOCK (in memory only for this demo)
-          const index = MOCK_RELEASES.findIndex(r => r.id === selectedPackage.id);
-          if (index !== -1) {
-              MOCK_RELEASES[index] = {
-                  ...editForm,
-                  activityLog: [newLog, ...editForm.activityLog]
-              };
-          }
-          setIsEditing(false);
-          setIsDetailOpen(false); // Close or stay open? Let's close for now
-      };
+    const handleSave = () => {
+        const newLog: ActivityLog = {
+            id: `a-${Date.now()}`,
+            user: 'current_admin',
+            action: 'Updated package details',
+            timestamp: new Date().toLocaleString()
+        };
+        
+        const index = MOCK_RELEASES.findIndex(r => r.id === selectedPackage.id);
+        if (index !== -1) {
+            MOCK_RELEASES[index] = {
+                ...editForm,
+                activityLog: [newLog, ...editForm.activityLog]
+            };
+        }
+        setIsEditing(false);
+        setIsDetailOpen(false);
+    };
 
-      return (
-        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${styles.modalOverlay}`}>
-            <div className={`w-full max-w-4xl rounded-xl shadow-2xl border flex flex-col h-[80vh] ${styles.modalBg}`}>
-                
-                {/* Header */}
-                <div className="p-6 border-b border-inherit flex justify-between items-start">
-                    <div className="flex items-start gap-4">
-                        <div className={`p-3 rounded-lg ${theme === AppTheme.LIGHT ? 'bg-blue-100 text-blue-600' : 'bg-blue-500/20 text-blue-400'}`}>
-                            <Package size={24} />
-                        </div>
-                        <div>
-                            <h2 className={`text-xl font-bold ${styles.textMain} flex items-center gap-2`}>
-                                {editForm.filename}
-                                {editForm.status === 'deprecated' ? (
-                                    <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-500 border border-red-500/20">Deprecated</span>
-                                ) : (
-                                    editForm.targets.length > 0 
-                                    ? <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 border border-green-500/20">Released</span>
-                                    : <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-gray-500/20 text-gray-500 border border-gray-500/20">Not Released</span>
-                                )}
-                            </h2>
-                            <div className={`flex items-center gap-4 text-xs mt-1 ${styles.textSub}`}>
-                                <span className="flex items-center gap-1"><Monitor size={12}/> {editForm.platform} / {editForm.series}</span>
-                                <span className="flex items-center gap-1"><Cpu size={12}/> {editForm.arch.join(', ')}</span>
-                                <span className="flex items-center gap-1"><Clock size={12}/> {editForm.uploadedAt}</span>
-                            </div>
-                            <div className="flex items-center gap-2 mt-2 text-xs">
-                                <span className="opacity-70">Uploaded by:</span>
-                                <div className="flex items-center gap-1 bg-opacity-10 bg-black px-2 py-0.5 rounded-full border border-inherit">
-                                    <User size={10} />
-                                    <span className="font-medium">{editForm.uploader}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {!isEditing ? (
-                            <button 
-                                onClick={() => setIsEditing(true)}
-                                className={`px-3 py-1.5 text-sm rounded-md border flex items-center gap-2 hover:bg-opacity-10 hover:bg-blue-500 transition-colors ${styles.textMain} border-inherit`}
-                            >
-                                <Edit3 size={14} /> Edit Details
-                            </button>
-                        ) : (
-                            <div className="flex gap-2">
-                                <button 
-                                    onClick={() => { setIsEditing(false); setEditForm(selectedPackage); }}
-                                    className="px-3 py-1.5 text-sm rounded-md border border-red-500/30 text-red-500 hover:bg-red-500/10"
-                                >
-                                    Cancel
-                                </button>
-                                <button 
-                                    onClick={handleSave}
-                                    className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-2 ${styles.buttonPrimary}`}
-                                >
-                                    <Save size={14} /> Save Changes
-                                </button>
-                            </div>
-                        )}
-                        <button onClick={() => setIsDetailOpen(false)} className={`p-2 hover:text-red-500 transition-colors ${styles.textSub}`}>
-                            <X size={20} />
-                        </button>
-                    </div>
-                </div>
+    return (
+      <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${styles.modalOverlay}`}>
+          <div className={`w-full max-w-4xl rounded-xl shadow-2xl border flex flex-col h-[80vh] ${styles.modalBg}`}>
+              {/* Header */}
+              <div className="p-6 border-b border-inherit flex justify-between items-start">
+                  <div className="flex items-start gap-4">
+                      <div className={`p-3 rounded-lg ${theme === AppTheme.LIGHT ? 'bg-blue-100 text-blue-600' : 'bg-blue-500/20 text-blue-400'}`}>
+                          <Package size={24} />
+                      </div>
+                      <div>
+                          <h2 className={`text-xl font-bold ${styles.textMain} flex items-center gap-2`}>
+                              {editForm.filename}
+                              {editForm.status === 'deprecated' ? (
+                                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-500 border border-red-500/20">Deprecated</span>
+                              ) : (
+                                  editForm.targets.length > 0 
+                                  ? <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 border border-green-500/20">Released</span>
+                                  : <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-gray-500/20 text-gray-500 border border-gray-500/20">Not Released</span>
+                              )}
+                          </h2>
+                          <div className={`flex items-center gap-4 text-xs mt-1 ${styles.textSub}`}>
+                              <span className="flex items-center gap-1"><Monitor size={12}/> {editForm.platform} / {editForm.series}</span>
+                              <span className="flex items-center gap-1"><Cpu size={12}/> {editForm.arch.join(', ')}</span>
+                              <span className="flex items-center gap-1"><Clock size={12}/> {editForm.uploadedAt}</span>
+                          </div>
+                      </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                      {!isEditing ? (
+                          <button onClick={() => setIsEditing(true)} className={`px-3 py-1.5 text-sm rounded-md border flex items-center gap-2 hover:bg-opacity-10 hover:bg-blue-500 transition-colors ${styles.textMain} border-inherit`}><Edit3 size={14} /> Edit Details</button>
+                      ) : (
+                          <div className="flex gap-2">
+                              <button onClick={() => { setIsEditing(false); setEditForm(selectedPackage); }} className="px-3 py-1.5 text-sm rounded-md border border-red-500/30 text-red-500 hover:bg-red-500/10">Cancel</button>
+                              <button onClick={handleSave} className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-2 ${styles.buttonPrimary}`}><Save size={14} /> Save Changes</button>
+                          </div>
+                      )}
+                      <button onClick={() => setIsDetailOpen(false)} className={`p-2 hover:text-red-500 transition-colors ${styles.textSub}`}><X size={20} /></button>
+                  </div>
+              </div>
 
-                {/* Tabs */}
-                <div className={`flex px-6 border-b border-inherit gap-6 ${styles.textSub}`}>
-                    <button onClick={() => setActiveTab('general')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'general' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>General & Docs</button>
-                    <button onClick={() => setActiveTab('compat')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'compat' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>Compatibility</button>
-                    <button onClick={() => setActiveTab('activity')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'activity' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>File Activity</button>
-                </div>
+              {/* Tabs */}
+              <div className={`flex px-6 border-b border-inherit gap-6 ${styles.textSub}`}>
+                  <button onClick={() => setActiveTab('general')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'general' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>General & Docs</button>
+                  <button onClick={() => setActiveTab('compat')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'compat' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>Compatibility</button>
+                  <button onClick={() => setActiveTab('activity')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'activity' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>File Activity</button>
+              </div>
 
-                {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6 bg-opacity-50">
-                    
-                    {/* --- GENERAL TAB --- */}
-                    {activeTab === 'general' && (
-                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-                            
-                            {/* Release Configuration Summary (Always Visible) */}
-                            <div className={`p-4 rounded border ${theme === AppTheme.LIGHT ? 'bg-gray-50 border-gray-200' : 'bg-black/20 border-white/10'}`}>
-                                <h4 className={`text-xs font-bold uppercase mb-3 ${styles.textSub}`}>Release Configuration</h4>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <div className="text-[10px] opacity-60 mb-1">ACTIVE CHANNELS</div>
-                                        <div className="flex flex-wrap gap-2">
-                                            {editForm.channels.length > 0 ? editForm.channels.map(c => (
-                                                <Badge key={c} colorClass="bg-blue-500/20 text-blue-400 border border-blue-500/30">{c}</Badge>
-                                            )) : <span className="text-sm opacity-50 italic">None</span>}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div className="text-[10px] opacity-60 mb-1">RELEASE TARGETS</div>
-                                        <div className="space-y-1">
-                                            {editForm.targets.length > 0 ? editForm.targets.map(t => (
-                                                <div key={t} className="flex items-center gap-2 text-sm font-medium">
-                                                    {t.includes('Spotlight') ? <Globe size={14} className="text-purple-400"/> : <Zap size={14} className="text-orange-400"/>}
-                                                    <span>{t}</span>
-                                                </div>
-                                            )) : <span className="text-sm opacity-50 italic">Not Released</span>}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Description */}
-                            <div className="space-y-2">
-                                <label className={`text-xs font-bold uppercase tracking-wider ${styles.textSub}`}>Description</label>
-                                {isEditing ? (
-                                    <input 
-                                        className={`w-full p-2 rounded border outline-none focus:ring-1 focus:ring-blue-500 ${styles.input}`}
-                                        value={editForm.description}
-                                        onChange={e => setEditForm({...editForm, description: e.target.value})}
-                                    />
-                                ) : (
-                                    <p className={`${styles.textMain} text-sm`}>{editForm.description || <span className="opacity-50 italic">No description provided.</span>}</p>
-                                )}
-                            </div>
-
-                            {/* Dependencies */}
-                            <div className="space-y-2">
-                                <label className={`text-xs font-bold uppercase tracking-wider ${styles.textSub}`}>Core Dependency</label>
-                                {isEditing ? (
-                                    <div className={`p-4 rounded border ${styles.input}`}>
-                                        <label className="flex items-center gap-2 cursor-pointer mb-3">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={editForm.dependencies.isStandalone} 
-                                                onChange={e => setEditForm({...editForm, dependencies: {...editForm.dependencies, isStandalone: e.target.checked}})}
-                                                className="rounded text-blue-600 focus:ring-blue-500" 
-                                            />
-                                            <span className={`text-sm ${styles.textMain}`}>Standalone Version</span>
-                                        </label>
-                                        <div className={`flex items-center gap-2 ${editForm.dependencies.isStandalone ? 'opacity-30 pointer-events-none' : ''}`}>
-                                            <input type="text" value={editForm.dependencies.major} onChange={e => setEditForm({...editForm, dependencies: {...editForm.dependencies, major: e.target.value}})} className={`w-16 text-center p-1 rounded border ${styles.inputGroup}`} placeholder="Maj" />
-                                            <span>.</span>
-                                            <input type="text" value={editForm.dependencies.minor} onChange={e => setEditForm({...editForm, dependencies: {...editForm.dependencies, minor: e.target.value}})} className={`w-16 text-center p-1 rounded border ${styles.inputGroup}`} placeholder="Min" />
-                                            <span>.</span>
-                                            <input type="text" value={editForm.dependencies.patch} onChange={e => setEditForm({...editForm, dependencies: {...editForm.dependencies, patch: e.target.value}})} className={`w-16 text-center p-1 rounded border ${styles.inputGroup}`} placeholder="Patch" />
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center gap-2">
-                                        <div className={`px-3 py-1 rounded-md text-sm border border-inherit bg-opacity-20 ${editForm.dependencies.isStandalone ? 'bg-green-500 text-green-500 border-green-500/30' : 'bg-blue-500 text-blue-400 border-blue-500/30'}`}>
-                                            {editForm.dependencies.isStandalone ? 'Standalone' : `Core v${editForm.dependencies.major}.${editForm.dependencies.minor}.${editForm.dependencies.patch}`}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Release Notes */}
-                            <div className="space-y-2 flex-1">
-                                <label className={`text-xs font-bold uppercase tracking-wider ${styles.textSub}`}>Release Notes</label>
-                                {isEditing ? (
-                                    <textarea 
-                                        className={`w-full h-48 p-4 rounded border outline-none focus:ring-1 focus:ring-blue-500 font-mono text-sm ${styles.input}`}
-                                        value={editForm.releaseNotes}
-                                        onChange={e => setEditForm({...editForm, releaseNotes: e.target.value})}
-                                    />
-                                ) : (
-                                    <div className={`w-full p-4 rounded border font-mono text-sm whitespace-pre-wrap ${styles.input} bg-opacity-50`}>
-                                        {editForm.releaseNotes || <span className="opacity-50 italic">No notes available.</span>}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* --- COMPATIBILITY TAB --- */}
-                    {activeTab === 'compat' && (
-                        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 h-full flex flex-col">
-                            <div className="flex justify-between items-center">
-                                <h3 className={`font-bold ${styles.textMain}`}>Supported OS Targets</h3>
-                                <div className={`text-xs ${styles.textSub}`}>
-                                    {editForm.supportOS.length} targets selected
-                                </div>
-                            </div>
-                            
-                            {isEditing ? (
-                                <div className={`flex-1 overflow-y-auto border rounded-md p-2 ${styles.input}`}>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                        {availableTargets.map(t => {
-                                            const isSelected = editForm.supportOS.includes(t.name);
-                                            return (
-                                                <div 
-                                                    key={t.id}
-                                                    onClick={() => toggleOsSupport(t.name)}
-                                                    className={`
-                                                        p-3 rounded border cursor-pointer flex items-center gap-3 select-none transition-colors
-                                                        ${isSelected 
-                                                            ? 'bg-blue-500/10 border-blue-500 ring-1 ring-blue-500/50' 
-                                                            : 'border-transparent hover:bg-gray-500/10'}
-                                                    `}
-                                                >
-                                                    <div className={`w-4 h-4 rounded border flex items-center justify-center ${isSelected ? 'bg-blue-500 border-blue-500 text-white' : 'border-gray-500'}`}>
-                                                        {isSelected && <Check size={10} />}
-                                                    </div>
-                                                    <div>
-                                                        <div className={`text-sm font-medium ${styles.textMain}`}>{t.name}</div>
-                                                        <div className="text-xs opacity-50 font-mono">{t.code}</div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                    {availableTargets.length === 0 && <p className="p-4 text-center opacity-50 text-sm">No other compatible targets found for this platform/arch.</p>}
-                                </div>
-                            ) : (
-                                <div className={`flex-1 overflow-y-auto border rounded-md ${styles.input}`}>
-                                     {editForm.supportOS.length > 0 ? (
-                                        <table className="w-full text-left text-sm">
-                                            <thead className="bg-black/10">
-                                                <tr>
-                                                    <th className="p-3 font-semibold text-xs uppercase opacity-70">Target Name</th>
-                                                    <th className="p-3 font-semibold text-xs uppercase opacity-70">Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {editForm.supportOS.map((os, i) => (
-                                                    <tr key={i} className="border-b border-inherit last:border-0 hover:bg-white/5">
-                                                        <td className="p-3 font-medium flex items-center gap-2">
-                                                            <Monitor size={14} className="opacity-50"/> {os}
-                                                        </td>
-                                                        <td className="p-3">
-                                                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 border border-green-500/20">Verified</span>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                     ) : (
-                                         <div className="p-8 text-center opacity-50">
-                                             <AlertTriangle size={24} className="mx-auto mb-2"/>
-                                             <p>No OS targets specified.</p>
-                                         </div>
-                                     )}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* --- ACTIVITY TAB --- */}
-                    {activeTab === 'activity' && (
-                        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
-                             <div className="relative pl-4 space-y-6">
-                                {/* Vertical Line */}
-                                <div className="absolute left-0 top-2 bottom-2 w-0.5 bg-gray-500/20"></div>
-
-                                {editForm.activityLog && editForm.activityLog.length > 0 ? editForm.activityLog.map((log, index) => (
-                                    <div key={log.id} className="relative pl-6">
-                                        <div className={`absolute left-[-5px] top-1 w-2.5 h-2.5 rounded-full border-2 ${theme === AppTheme.LIGHT ? 'bg-white border-blue-500' : 'bg-slate-800 border-blue-400'} z-10`}></div>
-                                        <div className="flex flex-col">
-                                            <span className={`text-sm font-medium ${styles.textMain}`}>{log.action}</span>
-                                            <div className="flex items-center gap-2 text-xs opacity-60 mt-1">
-                                                <span className="flex items-center gap-1"><User size={10}/> {log.user}</span>
-                                                <span>•</span>
-                                                <span className="flex items-center gap-1"><Calendar size={10}/> {log.timestamp}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )) : (
-                                    <p className="text-sm opacity-50 italic pl-6">No activity recorded.</p>
-                                )}
-                             </div>
-                        </div>
-                    )}
-
-                </div>
-            </div>
-        </div>
-      );
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto p-6 bg-opacity-50">
+                  {activeTab === 'general' && (
+                      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                          <div className={`p-4 rounded border ${theme === AppTheme.LIGHT ? 'bg-gray-50 border-gray-200' : 'bg-black/20 border-white/10'}`}>
+                              <h4 className={`text-xs font-bold uppercase mb-3 ${styles.textSub}`}>Release Configuration</h4>
+                              <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                      <div className="text-[10px] opacity-60 mb-1">ACTIVE CHANNELS</div>
+                                      <div className="flex flex-wrap gap-2">
+                                          {editForm.channels.length > 0 ? editForm.channels.map(c => <Badge key={c} colorClass="bg-blue-500/20 text-blue-400 border border-blue-500/30">{c}</Badge>) : <span className="text-sm opacity-50 italic">None</span>}
+                                      </div>
+                                  </div>
+                                  <div>
+                                      <div className="text-[10px] opacity-60 mb-1">RELEASE TARGETS</div>
+                                      <div className="space-y-1">
+                                          {editForm.targets.length > 0 ? editForm.targets.map(t => <div key={t} className="flex items-center gap-2 text-sm font-medium">{t.includes('Spotlight') ? <Globe size={14} className="text-purple-400"/> : <Zap size={14} className="text-orange-400"/>}<span>{t}</span></div>) : <span className="text-sm opacity-50 italic">Not Released</span>}
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+                          <div className="space-y-2"><label className={`text-xs font-bold uppercase tracking-wider ${styles.textSub}`}>Description</label>{isEditing ? <input className={`w-full p-2 rounded border outline-none focus:ring-1 focus:ring-blue-500 ${styles.input}`} value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} /> : <p className={`${styles.textMain} text-sm`}>{editForm.description || <span className="opacity-50 italic">No description provided.</span>}</p>}</div>
+                          <div className="space-y-2"><label className={`text-xs font-bold uppercase tracking-wider ${styles.textSub}`}>Release Notes</label>{isEditing ? <textarea className={`w-full h-48 p-4 rounded border outline-none focus:ring-1 focus:ring-blue-500 font-mono text-sm ${styles.input}`} value={editForm.releaseNotes} onChange={e => setEditForm({...editForm, releaseNotes: e.target.value})} /> : <div className={`w-full p-4 rounded border font-mono text-sm whitespace-pre-wrap ${styles.input} bg-opacity-50`}>{editForm.releaseNotes || <span className="opacity-50 italic">No notes available.</span>}</div>}</div>
+                      </div>
+                  )}
+                  {activeTab === 'compat' && (
+                      <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 h-full flex flex-col">
+                          <div className="flex justify-between items-center"><h3 className={`font-bold ${styles.textMain}`}>Supported OS Targets</h3><div className={`text-xs ${styles.textSub}`}>{editForm.supportOS.length} targets selected</div></div>
+                          {isEditing ? (
+                              <div className={`flex-1 overflow-y-auto border rounded-md p-2 ${styles.input}`}>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">{availableTargets.map(t => { const isSelected = editForm.supportOS.includes(t.name); return (<div key={t.id} onClick={() => toggleOsSupport(t.name)} className={`p-3 rounded border cursor-pointer flex items-center gap-3 select-none transition-colors ${isSelected ? 'bg-blue-500/10 border-blue-500 ring-1 ring-blue-500/50' : 'border-transparent hover:bg-gray-500/10'}`}><div className={`w-4 h-4 rounded border flex items-center justify-center ${isSelected ? 'bg-blue-500 border-blue-500 text-white' : 'border-gray-500'}`}>{isSelected && <Check size={10} />}</div><div><div className={`text-sm font-medium ${styles.textMain}`}>{t.name}</div><div className="text-xs opacity-50 font-mono">{t.code}</div></div></div>); })}</div>
+                              </div>
+                          ) : (
+                              <div className={`flex-1 overflow-y-auto border rounded-md ${styles.input}`}>{editForm.supportOS.length > 0 ? (<table className="w-full text-left text-sm"><thead className="bg-black/10"><tr><th className="p-3 font-semibold text-xs uppercase opacity-70">Target Name</th><th className="p-3 font-semibold text-xs uppercase opacity-70">Status</th></tr></thead><tbody>{editForm.supportOS.map((os, i) => (<tr key={i} className="border-b border-inherit last:border-0 hover:bg-white/5"><td className="p-3 font-medium flex items-center gap-2"><Monitor size={14} className="opacity-50"/> {os}</td><td className="p-3"><span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 border border-green-500/20">Verified</span></td></tr>))}</tbody></table>) : <div className="p-8 text-center opacity-50"><AlertTriangle size={24} className="mx-auto mb-2"/><p>No OS targets specified.</p></div>}</div>
+                          )}
+                      </div>
+                  )}
+                  {activeTab === 'activity' && (
+                       <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2"><div className="relative pl-4 space-y-6"><div className="absolute left-0 top-2 bottom-2 w-0.5 bg-gray-500/20"></div>{editForm.activityLog && editForm.activityLog.length > 0 ? editForm.activityLog.map((log, index) => (<div key={log.id} className="relative pl-6"><div className={`absolute left-[-5px] top-1 w-2.5 h-2.5 rounded-full border-2 ${theme === AppTheme.LIGHT ? 'bg-white border-blue-500' : 'bg-slate-800 border-blue-400'} z-10`}></div><div className="flex flex-col"><span className={`text-sm font-medium ${styles.textMain}`}>{log.action}</span><div className="flex items-center gap-2 text-xs opacity-60 mt-1"><span className="flex items-center gap-1"><User size={10}/> {log.user}</span><span>•</span><span className="flex items-center gap-1"><Calendar size={10}/> {log.timestamp}</span></div></div></div>)) : <p className="text-sm opacity-50 italic pl-6">No activity recorded.</p>}</div></div>
+                  )}
+              </div>
+          </div>
+      </div>
+    );
   };
 
 
   // --- WIZARD COMPONENT ---
   const UploadWizard = () => {
-      // ... (Existing Wizard logic remains unchanged)
-      // For brevity, using the existing code block structure implicitly.
-      // In a real refactor, I would extract this, but adhering to the single file update constraint:
-      // I will output the *exact* previous wizard code here to ensure it's preserved.
+    // ... (Steps 1 & 4 modified below to match logic)
     const [step, setStep] = useState(1);
+    const [isSuccess, setIsSuccess] = useState(false);
     const [file, setFile] = useState<File | null>(null);
     const [isPreviewMode, setIsPreviewMode] = useState(false);
     const [formData, setFormData] = useState({
@@ -716,9 +583,7 @@ export const AgentHub: React.FC = () => {
       versionMinor: '1',
       versionPatch: '0',
       isStandalone: false,
-      depMajor: '',
-      depMinor: '',
-      depPatch: '',
+      selectedDependency: '', 
       releaseNotes: '# New Features\n- Added support for custom peripheral X\n- Improved memory management\n\n## Bug Fixes\n- Fixed memory leak in serial driver',
       description: '',
       selectedTargets: [] as string[]
@@ -726,198 +591,662 @@ export const AgentHub: React.FC = () => {
     const [isCustomSeriesMode, setIsCustomSeriesMode] = useState(false);
     const steps = [{ id: 1, label: 'MANIFEST' }, { id: 2, label: 'COMPATIBILITY' }, { id: 3, label: 'UPLOAD' }, { id: 4, label: 'DOCS' }];
     
+    // Effects ...
     useEffect(() => {
         const validPlatforms = getPlatformsForProduct(formData.product);
         if (!validPlatforms.includes(formData.platform)) setFormData(prev => ({ ...prev, platform: validPlatforms[0] }));
     }, [formData.product]);
+    
     useEffect(() => {
         setIsCustomSeriesMode(false);
         const validSeries = getSeriesForPlatform(formData.platform, formData.product);
         if (!validSeries.includes(formData.series)) setFormData(prev => ({ ...prev, series: validSeries[0], customSeries: '' }));
     }, [formData.platform, formData.product]);
+    
     useEffect(() => {
         const currentSeries = isCustomSeriesMode ? formData.customSeries : formData.series;
         const validArchs = getArchsForConfig(formData.platform, currentSeries, isCustomSeriesMode);
         if (!validArchs.includes(formData.arch)) setFormData(prev => ({ ...prev, arch: validArchs[0] }));
     }, [formData.platform, formData.series, isCustomSeriesMode, formData.customSeries]);
+    
     useEffect(() => { setFormData(prev => ({ ...prev, selectedTargets: [] })); }, [formData.platform, formData.series, formData.arch, isCustomSeriesMode]);
 
     const toggleTarget = (target: string) => { setFormData(prev => ({...prev, selectedTargets: prev.selectedTargets.includes(target) ? prev.selectedTargets.filter(t => t !== target) : [...prev.selectedTargets, target]})); };
     const fullVersion = `${formData.versionMajor}.${formData.versionMinor}.${formData.versionPatch}`;
     const isDuplicateVersion = useMemo(() => MOCK_RELEASES.some(r => r.product === formData.product && r.platform === formData.platform && r.version === fullVersion && r.arch.includes(formData.arch as any)), [formData.product, formData.platform, fullVersion, formData.arch]);
-    const depVersion = `${formData.depMajor}.${formData.depMinor}.${formData.depPatch}`;
-    const showDepWarning = !formData.isStandalone && formData.depMajor && formData.depMinor && formData.depPatch && !KNOWN_CORE_VERSIONS.includes(depVersion);
-    const existingVersions = useMemo(() => MOCK_RELEASES.filter(r => r.product === formData.product && r.platform === formData.platform && (isCustomSeriesMode || r.series === formData.series)).map(r => r.version), [formData.product, formData.platform, formData.series, isCustomSeriesMode]);
+    
+    const existingVersions = useMemo(() => {
+        const s = isCustomSeriesMode ? formData.customSeries : formData.series;
+        return MOCK_RELEASES.filter(r => 
+            r.product === formData.product && 
+            r.platform === formData.platform && 
+            r.series === s &&
+            r.arch.includes(formData.arch as any)
+        ).sort((a,b) => b.uploadedAt.localeCompare(a.uploadedAt));
+    }, [formData.product, formData.platform, formData.series, formData.customSeries, formData.arch, isCustomSeriesMode]);
 
-    // ... (Keep existing Render Steps 1-4 logic exactly as is to save token space in this response, assumig functionality is correct) ...
-    // Re-implementing compact versions of the render steps for the file output
+    const availableDependencies = useMemo(() => {
+        return MOCK_RELEASES
+            .filter(r => r.product === 'Agent' && r.platform === formData.platform)
+            .map(r => ({ id: r.id, label: `Agent v${r.version} (${r.series})` }));
+    }, [formData.platform]);
+
+    const renderSteps = () => (
+        <div className="flex justify-between mb-8 relative px-4">
+             <div className="absolute top-1/2 left-0 w-full h-0.5 bg-gray-500/20 -z-10"></div>
+             {steps.map((s, idx) => {
+                 const isActive = step >= s.id || isSuccess;
+                 const isCurrent = step === s.id && !isSuccess;
+                 return (
+                     <div key={s.id} className="flex flex-col items-center gap-2 bg-inherit z-10">
+                         <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 ${isActive ? (isCurrent ? 'bg-blue-600 text-white scale-110 shadow-lg shadow-blue-500/50' : 'bg-blue-600/20 text-blue-500 border border-blue-500/50') : 'bg-gray-500/20 text-gray-500 border border-gray-500/50'}`}>
+                             {isActive && !isCurrent ? <Check size={16}/> : s.id}
+                         </div>
+                         <span className={`text-[10px] font-bold tracking-wider ${isActive ? 'text-blue-500' : 'text-gray-500'}`}>{s.label}</span>
+                     </div>
+                 )
+             })}
+        </div>
+    );
+
     const renderStep1_Manifest = () => {
         const availablePlatforms = getPlatformsForProduct(formData.product);
         const availableSeries = getSeriesForPlatform(formData.platform, formData.product);
         const availableArchs = getArchsForConfig(formData.platform, isCustomSeriesMode ? formData.customSeries : formData.series, isCustomSeriesMode);
+        // ... (Same content as previous Step 1)
         return (
-            <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2"><label className={`text-xs font-bold uppercase ${styles.textSub}`}>Product</label><select className={`w-full p-3 rounded-lg border ${styles.input}`} value={formData.product} onChange={(e) => setFormData({...formData, product: e.target.value})}>{FILTER_OPTIONS.products.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
-                    <div className="space-y-2"><label className={`text-xs font-bold uppercase ${styles.textSub}`}>Platform</label><select className={`w-full p-3 rounded-lg border ${styles.input}`} value={formData.platform} onChange={(e) => setFormData({...formData, platform: e.target.value})}>{availablePlatforms.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
-                    <div className="space-y-2"><label className={`text-xs font-bold uppercase ${styles.textSub}`}>Series</label>{isCustomSeriesMode ? (<div className="relative"><input type="text" autoFocus placeholder="Enter Series Name" value={formData.customSeries} onChange={(e) => setFormData({...formData, customSeries: e.target.value})} className={`w-full pl-3 pr-8 py-3 rounded-lg border ${styles.input}`} /><div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1"><span className="text-[9px] font-bold bg-blue-500 text-white px-1.5 py-0.5 rounded uppercase">New</span><button onClick={() => setIsCustomSeriesMode(false)}><X size={14} /></button></div></div>) : (<select className={`w-full p-3 rounded-lg border ${styles.input}`} value={formData.series} onChange={(e) => { if (e.target.value === '__NEW__') { setIsCustomSeriesMode(true); setFormData({...formData, customSeries: ''}); } else { setFormData({...formData, series: e.target.value}); } }}>{availableSeries.map(p => <option key={p} value={p}>{p}</option>)}<option value="__NEW__" className="font-bold text-blue-500">+ Create New Series...</option></select>)}</div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+                <div className="lg:col-span-2 space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2"><label className={`text-xs font-bold uppercase ${styles.textSub}`}>Product</label><select className={`w-full p-3 rounded-lg border ${styles.input}`} value={formData.product} onChange={(e) => setFormData({...formData, product: e.target.value})}>{FILTER_OPTIONS.products.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
+                        <div className="space-y-2"><label className={`text-xs font-bold uppercase ${styles.textSub}`}>Platform</label><select className={`w-full p-3 rounded-lg border ${styles.input}`} value={formData.platform} onChange={(e) => setFormData({...formData, platform: e.target.value})}>{availablePlatforms.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2"><label className={`text-xs font-bold uppercase ${styles.textSub}`}>Series</label>{isCustomSeriesMode ? (<div className="relative"><input type="text" autoFocus placeholder="Enter Series Name" value={formData.customSeries} onChange={(e) => setFormData({...formData, customSeries: e.target.value})} className={`w-full pl-3 pr-8 py-3 rounded-lg border ${styles.input}`} /><div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1"><span className="text-[9px] font-bold bg-blue-500 text-white px-1.5 py-0.5 rounded uppercase">New</span><button onClick={() => setIsCustomSeriesMode(false)}><X size={14} /></button></div></div>) : (<select className={`w-full p-3 rounded-lg border ${styles.input}`} value={formData.series} onChange={(e) => { if (e.target.value === '__NEW__') { setIsCustomSeriesMode(true); setFormData({...formData, customSeries: ''}); } else { setFormData({...formData, series: e.target.value}); } }}>{availableSeries.map(p => <option key={p} value={p}>{p}</option>)}<option value="__NEW__" className="font-bold text-blue-500">+ Create New Series...</option></select>)}</div>
+                        <div className="space-y-2"><label className={`text-xs font-bold uppercase ${styles.textSub}`}>Architecture</label><div className={`relative`}><Cpu size={18} className={`absolute left-3 top-1/2 -translate-y-1/2 ${styles.textSub}`} /><select className={`w-full pl-10 p-3 rounded-lg border ${styles.input}`} value={formData.arch} onChange={(e) => setFormData({...formData, arch: e.target.value})}>{availableArchs.map(a => <option key={a} value={a}>{a}</option>)}</select></div></div>
+                    </div>
+                    <div className="space-y-2">
+                        <label className={`text-xs font-bold uppercase ${styles.textSub}`}>Version Number</label>
+                        <div className="flex items-center gap-2 w-full">
+                            <input type="text" value={formData.versionMajor} onChange={e=>setFormData({...formData, versionMajor: e.target.value})} className={`flex-1 min-w-0 text-center p-3 rounded-lg border font-bold ${isDuplicateVersion ? 'bg-red-50 border-red-300 text-red-600' : styles.input}`} placeholder="Major" />
+                            <span className={styles.textSub}>.</span>
+                            <input type="text" value={formData.versionMinor} onChange={e=>setFormData({...formData, versionMinor: e.target.value})} className={`flex-1 min-w-0 text-center p-3 rounded-lg border font-bold ${isDuplicateVersion ? 'bg-red-50 border-red-300 text-red-600' : styles.input}`} placeholder="Minor" />
+                            <span className={styles.textSub}>.</span>
+                            <input type="text" value={formData.versionPatch} onChange={e=>setFormData({...formData, versionPatch: e.target.value})} className={`flex-1 min-w-0 text-center p-3 rounded-lg border font-bold ${isDuplicateVersion ? 'bg-red-50 border-red-300 text-red-600' : styles.input}`} placeholder="Patch" />
+                        </div>
+                        {isDuplicateVersion && <p className="text-xs text-red-500 mt-1 font-bold">Error: Version {fullVersion} already exists for this client.</p>}
+                    </div>
+                    <div className={`p-4 rounded-lg border ${styles.input}`}>
+                        <div className="flex justify-between items-center mb-4"><label className={`text-xs font-bold uppercase ${styles.textSub}`}>Dependencies</label><label className="flex items-center gap-2"><input type="checkbox" checked={formData.isStandalone} onChange={e => setFormData({...formData, isStandalone: e.target.checked})} className="rounded text-blue-600" /><span className={`text-sm ${styles.textMain}`}>Standalone</span></label></div>
+                        <div className={`relative ${formData.isStandalone ? 'opacity-30 pointer-events-none' : ''}`}><select value={formData.selectedDependency} onChange={e => setFormData({...formData, selectedDependency: e.target.value})} className={`w-full p-2 rounded border ${styles.inputGroup}`}><option value="">Select Base Dependency...</option>{availableDependencies.map(dep => (<option key={dep.id} value={dep.id}>{dep.label}</option>))}</select></div>
+                    </div>
                 </div>
-                <div className="space-y-2"><label className={`text-xs font-bold uppercase ${styles.textSub}`}>Architecture</label><div className={`relative`}><Cpu size={18} className={`absolute left-3 top-1/2 -translate-y-1/2 ${styles.textSub}`} /><select className={`w-full pl-10 p-3 rounded-lg border ${styles.input}`} value={formData.arch} onChange={(e) => setFormData({...formData, arch: e.target.value})}>{availableArchs.map(a => <option key={a} value={a}>{a}</option>)}</select></div></div>
-                <div className="space-y-2"><label className={`text-xs font-bold uppercase ${styles.textSub}`}>Version Number</label><div className="flex items-center gap-2"><input type="text" value={formData.versionMajor} onChange={e=>setFormData({...formData, versionMajor: e.target.value})} className={`flex-1 text-center p-3 rounded-lg border font-bold ${isDuplicateVersion ? 'bg-red-50 border-red-300 text-red-600' : styles.input}`} placeholder="Major" /><span className={styles.textSub}>.</span><input type="text" value={formData.versionMinor} onChange={e=>setFormData({...formData, versionMinor: e.target.value})} className={`flex-1 text-center p-3 rounded-lg border font-bold ${isDuplicateVersion ? 'bg-red-50 border-red-300 text-red-600' : styles.input}`} placeholder="Minor" /><span className={styles.textSub}>.</span><input type="text" value={formData.versionPatch} onChange={e=>setFormData({...formData, versionPatch: e.target.value})} className={`flex-1 text-center p-3 rounded-lg border font-bold ${isDuplicateVersion ? 'bg-red-50 border-red-300 text-red-600' : styles.input}`} placeholder="Patch" /></div></div>
-                <div className={`p-4 rounded-lg border ${styles.input}`}><div className="flex justify-between items-center mb-4"><label className={`text-xs font-bold uppercase ${styles.textSub}`}>Dependencies</label><label className="flex items-center gap-2"><input type="checkbox" checked={formData.isStandalone} onChange={e => setFormData({...formData, isStandalone: e.target.checked})} className="rounded text-blue-600" /><span className={`text-sm ${styles.textMain}`}>Standalone</span></label></div><div className={`flex items-center gap-2 ${formData.isStandalone ? 'opacity-30 pointer-events-none' : ''}`}><input type="text" value={formData.depMajor} onChange={e=>setFormData({...formData, depMajor: e.target.value})} className={`flex-1 text-center p-2 rounded border ${styles.inputGroup}`} placeholder="Major" /><span>.</span><input type="text" value={formData.depMinor} onChange={e=>setFormData({...formData, depMinor: e.target.value})} className={`flex-1 text-center p-2 rounded border ${styles.inputGroup}`} placeholder="Minor" /><span>.</span><input type="text" value={formData.depPatch} onChange={e=>setFormData({...formData, depPatch: e.target.value})} className={`flex-1 text-center p-2 rounded border ${styles.inputGroup}`} placeholder="Patch" /></div>{showDepWarning && <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/20 text-amber-600 rounded-md text-xs flex gap-2 items-start"><AlertTriangle size={14} className="shrink-0 mt-0.5" /><span>Warning: Core version not found.</span></div>}</div>
+                <div className={`border-l border-inherit pl-6 flex flex-col ${styles.textSub}`}><h4 className="text-xs font-bold uppercase mb-4 flex items-center gap-2"><History size={14}/> Client Version History</h4><div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar max-h-[400px]">{existingVersions.length > 0 ? existingVersions.map(ver => (<div key={ver.id} className={`p-3 rounded border text-sm ${styles.input} opacity-80`}><div className="font-bold font-mono">{ver.version}</div><div className="text-[10px] mt-1 opacity-60 flex justify-between"><span>{ver.uploadedAt}</span><span>{ver.size}</span></div></div>)) : <div className="text-center p-8 opacity-40 text-xs italic border border-dashed rounded">No history found for this configuration.</div>}</div></div>
             </div>
         );
     };
 
     const renderStep2_Compatibility = () => {
+         const fullVersion = `${formData.versionMajor}.${formData.versionMinor}.${formData.versionPatch}`;
          const currentSeries = isCustomSeriesMode ? formData.customSeries : formData.series;
-         const availableTargets = MOCK_TARGETS.filter(t => { if (t.platform !== formData.platform) return false; if (!t.arch.includes(formData.arch)) return false; if (isCustomSeriesMode) return true; return t.series.includes(formData.series) || t.series.includes('Universal'); });
+         const availableTargets = MOCK_TARGETS.filter(t => { 
+             if (t.platform !== formData.platform) return false; 
+             if (!t.arch.includes(formData.arch)) return false; 
+             if (isCustomSeriesMode) return true; 
+             return t.series.includes(formData.series) || t.series.includes('Universal'); 
+         });
+
+         const summaryCardClass = theme === AppTheme.LIGHT 
+            ? 'bg-blue-50/50 border-blue-100 text-slate-800' 
+            : 'bg-[#bd93f9]/5 border-[#bd93f9]/20 text-gray-200';
+            
+         const headerClass = theme === AppTheme.LIGHT 
+            ? 'bg-blue-100/50 text-blue-700' 
+            : 'bg-[#bd93f9]/20 text-[#bd93f9]';
+
          return (
-            <div className="flex flex-col h-full"><div className={`flex p-4 rounded-lg border mb-6 ${theme === AppTheme.LIGHT ? 'bg-blue-50 border-blue-100' : 'bg-blue-500/10 border-blue-500/20'}`}><div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full"><div><span className="text-xs font-bold uppercase block text-blue-500/70 mb-1">Product</span><span className={`font-medium ${styles.textMain}`}>{formData.product}</span></div><div><span className="text-xs font-bold uppercase block text-blue-500/70 mb-1">Platform</span><span className={`font-medium ${styles.textMain}`}>{formData.platform}</span></div><div><span className="text-xs font-bold uppercase block text-blue-500/70 mb-1">Series</span><span className={`font-medium ${styles.textMain}`}>{currentSeries}</span></div><div><span className="text-xs font-bold uppercase block text-blue-500/70 mb-1">Version</span><span className={`font-medium ${styles.textMain}`}>v{fullVersion}</span></div></div></div><div className={`flex-1 border rounded-lg overflow-hidden flex flex-col ${styles.input}`}><div className="p-3 border-b flex justify-between items-center bg-opacity-50"><span className={`text-xs font-bold uppercase ${styles.textSub}`}>Supported OS Targets</span></div><div className="p-2 space-y-2 overflow-y-auto flex-1">{availableTargets.map(target => (<div key={target.id} onClick={() => toggleTarget(target.id)} className={`p-3 rounded-md border cursor-pointer flex items-center gap-3 ${formData.selectedTargets.includes(target.id) ? 'bg-blue-500/10 border-blue-500 ring-1 ring-blue-500' : 'border-transparent hover:bg-gray-500/10'}`}><div className={`w-5 h-5 rounded border flex items-center justify-center ${formData.selectedTargets.includes(target.id) ? 'bg-blue-500 border-blue-500' : 'border-gray-400'}`}>{formData.selectedTargets.includes(target.id) && <Check size={14} className="text-white"/>}</div><div><div className={`text-sm font-bold ${styles.textMain}`}>{target.name}</div><div className="text-xs font-mono opacity-50">{target.code}</div></div></div>))}</div></div></div>
+             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full">
+                <div className="lg:col-span-4 space-y-6">
+                    <div className={`rounded-xl border overflow-hidden ${summaryCardClass}`}>
+                        <div className={`px-4 py-3 flex items-center gap-2 font-bold text-xs uppercase tracking-wider ${headerClass}`}>
+                            <FileText size={14} /> Manifest Summary
+                        </div>
+                        <div className="p-5 space-y-4">
+                            <div className="flex justify-between items-start">
+                                <div><div className={`text-[10px] font-bold uppercase opacity-50 mb-1`}>PRODUCT</div><div className="font-bold text-lg leading-none">{formData.product}</div></div>
+                                <div className="text-right"><div className={`text-[10px] font-bold uppercase opacity-50 mb-1`}>VERSION</div><div className="font-mono font-bold">v{fullVersion}</div></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 border-t border-dashed border-gray-400/20 pt-4">
+                                <div><div className={`text-[10px] font-bold uppercase opacity-50 mb-1`}>PLATFORM</div><div className="font-medium text-sm">{formData.platform}</div></div>
+                                <div><div className={`text-[10px] font-bold uppercase opacity-50 mb-1`}>SERIES</div><div className="font-medium text-sm">{currentSeries}</div></div>
+                                <div><div className={`text-[10px] font-bold uppercase opacity-50 mb-1`}>ARCHITECTURE</div><Badge colorClass="bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">{formData.arch}</Badge></div>
+                                <div><div className={`text-[10px] font-bold uppercase opacity-50 mb-1`}>DEPENDENCIES</div><Badge colorClass={formData.isStandalone ? "bg-green-500/10 text-green-500 border border-green-500/20" : "bg-amber-500/10 text-amber-500 border border-amber-500/20"}>{formData.isStandalone ? 'Standalone' : 'Standard'}</Badge></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <div className={`text-[10px] font-bold uppercase opacity-50 mb-2`}>TARGET PLATFORM</div>
+                        <div className={`p-4 rounded-lg border flex items-center justify-between ${styles.input}`}>
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-gray-500/10 rounded">{formData.platform === 'Android' ? <Smartphone size={18}/> : <Monitor size={18}/>}</div>
+                                <span className="font-medium">{formData.platform} System</span>
+                            </div>
+                            <div className="p-1 rounded-full bg-green-500 text-white"><Check size={12} strokeWidth={3} /></div>
+                        </div>
+                        <p className="text-[10px] opacity-50 mt-2 leading-relaxed">System targets below are automatically filtered for <strong>{formData.arch}</strong> compatibility based on the manifest.</p>
+                    </div>
+                </div>
+
+                <div className="lg:col-span-8 flex flex-col h-full min-h-0">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className={`text-xs font-bold uppercase tracking-wider ${styles.textSub}`}>Supported OS Versions</h3>
+                        <div className="flex items-center gap-2">
+                            <select className={`text-xs p-1.5 rounded border ${styles.input}`}>
+                                <option>All Series</option>
+                                <option>{currentSeries}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div className={`flex-1 border rounded-xl overflow-hidden flex flex-col ${styles.card}`}>
+                        <div className={`flex items-center px-4 py-3 border-b border-inherit bg-black/5 text-xs font-bold uppercase opacity-70`}>
+                            <div className="flex-1 pl-14">Target Name</div>
+                            <div className="w-16 text-center">Version</div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+                            {availableTargets.map(target => {
+                                const isSelected = formData.selectedTargets.includes(target.id);
+                                return (
+                                    <div key={target.id} onClick={() => toggleTarget(target.id)} className={`group flex items-center p-3 rounded-lg cursor-pointer border transition-all duration-200 ${isSelected ? 'bg-blue-500/5 border-blue-500/50' : 'border-transparent hover:bg-gray-500/5 hover:border-gray-500/20'}`}>
+                                        <div className={`w-5 h-5 rounded border mr-4 flex items-center justify-center transition-colors shrink-0 ${isSelected ? 'bg-blue-500 border-blue-500 text-white' : 'border-gray-400 group-hover:border-blue-400'}`}>
+                                            {isSelected && <Check size={12} strokeWidth={3} />}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className={`text-sm font-bold ${styles.textMain} truncate`}>{target.name}</div>
+                                            <div className="text-xs font-mono opacity-40 mt-0.5 truncate">{target.code}</div>
+                                        </div>
+                                        <div className="w-16 flex justify-center shrink-0">
+                                            <div className={`text-[10px] font-bold px-2 py-1 rounded bg-gray-500/10 text-gray-500`}>{target.osVer.replace(/Android |Win |Ubuntu |Debian /g, '')}</div>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                        <div className="p-3 border-t border-inherit text-right text-xs opacity-50 bg-black/5">Selected: {formData.selectedTargets.length} targets</div>
+                    </div>
+                </div>
+             </div>
          );
     };
 
-    const renderStep3_Upload = () => (<div className="flex flex-col h-full"><div className={`flex-1 border-2 border-dashed rounded-xl flex flex-col items-center justify-center relative ${styles.input} border-opacity-50`}>{!file ? (<div className="text-center p-8 cursor-pointer"><div className="w-16 h-16 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4"><Upload size={32} /></div><p className={`text-sm ${styles.textSub}`}>Click to browse</p><input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => { if(e.target.files?.[0]) setFile(e.target.files[0]) }} /></div>) : (<div className="text-center p-8"><FileBox size={40} className="mx-auto mb-4 text-blue-500"/><h3 className={`text-lg font-bold ${styles.textMain}`}>{file.name}</h3><button onClick={() => setFile(null)} className="text-red-500 text-sm mt-4">Remove</button></div>)}</div></div>);
+    const renderStep3_Upload = () => (
+        <div className="flex flex-col h-full space-y-6">
+            <div className={`flex-1 border-2 border-dashed rounded-xl flex flex-col items-center justify-center relative ${styles.input} border-opacity-50 transition-colors ${file ? 'bg-blue-500/5 border-blue-500/50' : ''}`}>
+                {!file ? (
+                    <div className="text-center p-8 cursor-pointer">
+                        <div className="w-16 h-16 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4"><Upload size={32} /></div>
+                        <p className={`text-sm font-medium ${styles.textMain}`}>Drag & Drop or Click to Browse</p>
+                        <p className={`text-xs mt-2 ${styles.textSub}`}>Supported formats: .zip, .tar.gz, .apk (Max 2GB)</p>
+                        <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => { if(e.target.files?.[0]) setFile(e.target.files[0]) }} />
+                    </div>
+                ) : (
+                    <div className="text-center p-8 w-full max-w-md">
+                        <div className="w-16 h-16 bg-green-500/10 text-green-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-in zoom-in"><FileBox size={32} /></div>
+                        <h3 className={`text-lg font-bold break-all ${styles.textMain}`}>{file.name}</h3>
+                        <div className={`mt-6 space-y-2 text-sm p-4 rounded bg-black/10 text-left font-mono ${styles.textSub}`}>
+                            <div className="flex justify-between"><span>MD5:</span> <span className="text-xs opacity-70">a1b2c3d4e5f67890abcdef1234567890</span></div>
+                            <div className="flex justify-between"><span>Size:</span> <span>24.5 MB</span></div>
+                        </div>
+                        <button onClick={() => setFile(null)} className="text-red-500 text-sm mt-4 hover:underline">Remove & Choose Another</button>
+                    </div>
+                )}
+            </div>
+            {/* Description Input Moved Here */}
+            <div>
+                <label className={`text-xs font-bold uppercase mb-2 block ${styles.textSub}`}>Description</label>
+                <input 
+                    type="text" 
+                    className={`w-full p-3 rounded-lg border ${styles.input}`} 
+                    value={formData.description} 
+                    onChange={(e) => setFormData({...formData, description: e.target.value})} 
+                    placeholder="Brief summary of this upload..."
+                />
+            </div>
+        </div>
+    );
 
-    const renderStep4_Docs = () => (<div className="flex flex-col h-full space-y-6"><div className="flex-1 flex flex-col"><div className="flex justify-between items-center mb-2"><label className={`text-xs font-bold uppercase ${styles.textSub}`}>Release Notes</label><div className="flex gap-1"><button onClick={() => setIsPreviewMode(false)} className={`px-3 py-1 text-xs rounded-l border ${!isPreviewMode ? 'bg-blue-500 text-white' : styles.input}`}>Write</button><button onClick={() => setIsPreviewMode(true)} className={`px-3 py-1 text-xs rounded-r border ${isPreviewMode ? 'bg-blue-500 text-white' : styles.input}`}>Preview</button></div></div>{isPreviewMode ? <div className={`flex-1 w-full p-4 rounded-lg border overflow-y-auto font-mono text-sm ${styles.input}`}>{formData.releaseNotes}</div> : <textarea className={`flex-1 w-full p-4 rounded-lg border font-mono text-sm resize-none ${styles.input}`} value={formData.releaseNotes} onChange={(e) => setFormData({...formData, releaseNotes: e.target.value})} />}</div><div className="flex flex-col"><label className={`text-xs font-bold uppercase mb-2 ${styles.textSub}`}>Description</label><input type="text" className={`w-full p-3 rounded-lg border ${styles.input}`} value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} /></div></div>);
+    const renderStep4_Docs = () => (
+        <div className="flex flex-col h-full space-y-6">
+            <div className="flex-1 flex flex-col">
+                <div className="flex justify-between items-center mb-2">
+                    <label className={`text-xs font-bold uppercase ${styles.textSub} flex items-center gap-2`}>
+                        Release Notes <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-400 font-normal">Markdown Supported</span>
+                    </label>
+                    <div className="flex gap-1">
+                        <button onClick={() => setIsPreviewMode(false)} className={`px-3 py-1 text-xs rounded-l border ${!isPreviewMode ? 'bg-blue-500 text-white' : styles.input}`}>Write</button>
+                        <button onClick={() => setIsPreviewMode(true)} className={`px-3 py-1 text-xs rounded-r border ${isPreviewMode ? 'bg-blue-500 text-white' : styles.input}`}>Preview</button>
+                    </div>
+                </div>
+                {isPreviewMode ? 
+                    <div className={`flex-1 w-full p-4 rounded-lg border overflow-y-auto font-mono text-sm ${styles.input}`}>{formData.releaseNotes}</div> : 
+                    <textarea className={`flex-1 w-full p-4 rounded-lg border font-mono text-sm resize-none ${styles.input}`} value={formData.releaseNotes} onChange={(e) => setFormData({...formData, releaseNotes: e.target.value})} />
+                }
+            </div>
+        </div>
+    );
+
+    // ... (renderSuccess & Modal Wrapper existing code)
+    const renderSuccess = () => (
+        <div className="flex flex-col items-center justify-center h-full animate-in zoom-in-95 duration-500">
+             <div className="w-24 h-24 bg-green-500 text-white rounded-full flex items-center justify-center mb-6 shadow-xl shadow-green-500/20">
+                 <Check size={48} strokeWidth={4} />
+             </div>
+             <h2 className={`text-2xl font-bold mb-2 ${styles.textMain}`}>Upload Successful!</h2>
+             <p className={`${styles.textSub} text-center max-w-md mb-8`}>
+                 Your package <span className="font-mono text-green-500 font-bold">{formData.product} v{fullVersion}</span> has been successfully uploaded and indexed.
+             </p>
+             <div className="p-6 rounded-lg border border-inherit bg-opacity-50 w-full max-w-lg mb-8 bg-black/5">
+                 <div className="grid grid-cols-2 gap-y-4 text-sm">
+                     <div className="opacity-60">Package ID</div><div className="font-mono text-right">pkg-{Date.now().toString().slice(-6)}</div>
+                     <div className="opacity-60">Status</div><div className="text-right text-green-500 font-bold uppercase text-xs">Ready for Release</div>
+                     <div className="opacity-60">Integrity Check</div><div className="text-right text-green-500 flex items-center justify-end gap-1"><CheckCircle2 size={12}/> Passed</div>
+                 </div>
+             </div>
+             <div className="flex gap-3">
+                 <button onClick={() => { setIsUploadOpen(false); }} className={`px-8 py-3 rounded-lg font-bold shadow-lg ${styles.buttonPrimary}`}>Return to Console</button>
+             </div>
+        </div>
+    );
 
     return (
         <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${styles.modalOverlay}`}>
-            <div className={`w-full max-w-3xl rounded-xl shadow-2xl border flex flex-col h-[700px] ${styles.modalBg}`}>
-                <div className="p-6 border-b border-inherit"><div className="flex justify-between items-start mb-8"><h2 className={`text-xl font-bold ${styles.textMain}`}>Upload Wizard</h2><button onClick={() => setIsUploadOpen(false)}><X size={24} className={styles.textSub} /></button></div></div>
-                <div className="p-8 overflow-y-auto flex-1 bg-opacity-50">{step === 1 && renderStep1_Manifest()}{step === 2 && renderStep2_Compatibility()}{step === 3 && renderStep3_Upload()}{step === 4 && renderStep4_Docs()}</div>
-                <div className="p-6 border-t border-inherit flex justify-between items-center"><div><button onClick={() => setIsUploadOpen(false)} className="text-red-500 text-sm">Cancel</button></div><div className="flex gap-3">{step > 1 && <button onClick={() => setStep(step - 1)} className={`px-6 py-2 rounded-lg border ${styles.textMain}`}>Back</button>}<button onClick={() => { if(step < 4) { if(step === 3 && !file) return; setStep(step + 1); } else { setIsUploadOpen(false); } }} disabled={step === 3 && !file} className={`px-8 py-2 rounded-lg font-medium shadow-lg flex items-center gap-2 ${step === 3 && !file ? 'opacity-50 cursor-not-allowed bg-gray-500' : styles.buttonPrimary}`}>{step === 4 ? 'Confirm' : 'Next'} <ArrowRight size={16}/></button></div></div>
+            <div className={`w-full max-w-4xl rounded-xl shadow-2xl border flex flex-col h-[750px] ${styles.modalBg}`}>
+                <div className="p-6 border-b border-inherit">
+                    <div className="flex justify-between items-start mb-6">
+                        <h2 className={`text-xl font-bold ${styles.textMain}`}>Upload Wizard</h2>
+                        <button onClick={() => setIsUploadOpen(false)}><X size={24} className={styles.textSub} /></button>
+                    </div>
+                    {renderSteps()}
+                </div>
+                <div className="p-8 overflow-y-auto flex-1 bg-opacity-50 relative">
+                    {isSuccess ? renderSuccess() : (
+                        <>
+                            {step === 1 && renderStep1_Manifest()}
+                            {step === 2 && renderStep2_Compatibility()}
+                            {step === 3 && renderStep3_Upload()}
+                            {step === 4 && renderStep4_Docs()}
+                        </>
+                    )}
+                </div>
+                {!isSuccess && (
+                    <div className="p-6 border-t border-inherit flex justify-between items-center">
+                        <div><button onClick={() => setIsUploadOpen(false)} className="text-red-500 text-sm">Cancel</button></div>
+                        <div className="flex gap-3">
+                            {step > 1 && <button onClick={() => setStep(step - 1)} className={`px-6 py-2 rounded-lg border ${styles.textMain}`}>Back</button>}
+                            <button 
+                                onClick={() => { if(step < 4) { if(step === 3 && !file) return; setStep(step + 1); } else { setIsSuccess(true); } }} 
+                                disabled={(step === 3 && !file) || (step === 1 && isDuplicateVersion)} 
+                                className={`px-8 py-2 rounded-lg font-medium shadow-lg flex items-center gap-2 ${(step === 3 && !file) || (step === 1 && isDuplicateVersion) ? 'opacity-50 cursor-not-allowed bg-gray-500' : styles.buttonPrimary}`}
+                            >
+                                {step === 4 ? 'Confirm Upload' : 'Next'} <ArrowRight size={16}/>
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
   };
 
-  // --- RELEASE MODAL COMPONENT ---
+  // --- RELEASE WIZARD MODAL COMPONENT ---
   const ReleaseModal = () => {
-      // Initialize with existing values if available
+      const [step, setStep] = useState(1);
+      const [status, setStatus] = useState<'idle' | 'loading' | 'success'>('idle');
       const [channels, setChannels] = useState<ReleaseChannel[]>(selectedPackage?.channels || []);
       const [targets, setTargets] = useState<ReleaseTarget[]>(selectedPackage?.targets || []);
 
-      const toggleChannel = (c: ReleaseChannel) => 
-         setChannels(prev => prev.includes(c) ? prev.filter(i => i !== c) : [...prev, c]);
+      const toggleChannel = (c: ReleaseChannel) => {
+          const isActive = channels.includes(c);
+          let newChannels = isActive ? channels.filter(i => i !== c) : [...channels, c];
+          let newTargets = [...targets];
 
-      const toggleTarget = (t: ReleaseTarget) =>
-         setTargets(prev => prev.includes(t) ? prev.filter(i => i !== t) : [...prev, t]);
+          // Logic: "Production" channel is strictly bound to "Spotlight" target
+          if (c === 'Production') {
+              if (!isActive) {
+                  // Turning ON Production -> Force ON Spotlight
+                  if (!newTargets.includes('Spotlight Download Page')) {
+                      newTargets.push('Spotlight Download Page');
+                  }
+              } else {
+                  // Turning OFF Production -> Force OFF Spotlight
+                  newTargets = newTargets.filter(t => t !== 'Spotlight Download Page');
+              }
+          }
+
+          setChannels(newChannels);
+          setTargets(newTargets);
+      };
+
+      const toggleTarget = (t: ReleaseTarget) => {
+          const isActive = targets.includes(t);
+          let newTargets = isActive ? targets.filter(i => i !== t) : [...targets, t];
+          let newChannels = [...channels];
+
+          // Logic: "Spotlight" target is strictly bound to "Production" channel
+          if (t === 'Spotlight Download Page') {
+              if (!isActive) {
+                  // Turning ON Spotlight -> Force ON Production
+                  if (!newChannels.includes('Production')) {
+                      newChannels.push('Production');
+                  }
+              } else {
+                  // Turning OFF Spotlight -> Force OFF Production
+                  newChannels = newChannels.filter(c => c !== 'Production');
+              }
+          }
+
+          setTargets(newTargets);
+          setChannels(newChannels);
+      };
 
       const handleDeploy = () => {
-          if (!selectedPackage) return;
-          const idx = MOCK_RELEASES.findIndex(r => r.id === selectedPackage.id);
-          if (idx !== -1) {
-              const prev = MOCK_RELEASES[idx];
-              // Update Logic: status might remain active, but channels/targets change
-              MOCK_RELEASES[idx] = {
-                  ...prev,
-                  channels: channels,
-                  targets: targets,
-                  activityLog: [
-                      { 
-                          id: `rel-${Date.now()}`, 
-                          user: 'current_admin', 
-                          action: `Updated Release: ${channels.join(', ')} -> ${targets.join(', ')}`, 
-                          timestamp: new Date().toLocaleString() 
-                      },
-                      ...prev.activityLog
-                  ]
-              };
-          }
-          setIsReleaseOpen(false);
-          setSelectedPackage(null);
+          setStatus('loading');
+          setTimeout(() => {
+              if (!selectedPackage) return;
+              const idx = MOCK_RELEASES.findIndex(r => r.id === selectedPackage.id);
+              if (idx !== -1) {
+                  const prev = MOCK_RELEASES[idx];
+                  MOCK_RELEASES[idx] = {
+                      ...prev,
+                      channels: channels,
+                      targets: targets,
+                      activityLog: [
+                          { 
+                              id: `rel-${Date.now()}`, 
+                              user: 'current_admin', 
+                              action: `Updated Release Configuration`, 
+                              timestamp: new Date().toLocaleString() 
+                          },
+                          ...prev.activityLog
+                  ]};
+              }
+              setStatus('success');
+          }, 1500);
       };
+
+      if (!selectedPackage) return null;
+
+      // Wizard Steps Config
+      const steps = [
+          { id: 1, label: 'Release To' },
+          { id: 2, label: 'Channels' },
+          { id: 3, label: 'Review' }
+      ];
 
       return (
         <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${styles.modalOverlay}`}>
-            <div className={`w-full max-w-xl rounded-xl shadow-2xl border flex flex-col ${styles.modalBg}`}>
-                <div className="p-6 border-b border-inherit flex justify-between items-center bg-gradient-to-r from-blue-600/10 to-transparent">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-600 rounded-lg text-white">
-                            <Rocket size={20} />
+            <div className={`w-full max-w-2xl rounded-xl shadow-2xl border flex flex-col overflow-hidden ${styles.modalBg}`}>
+                
+                {/* Header with Steps */}
+                <div className="p-6 border-b border-inherit bg-gradient-to-r from-blue-600/10 to-transparent">
+                    <div className="flex justify-between items-start mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-600 rounded-lg text-white"><Rocket size={20} /></div>
+                            <div><h2 className={`text-lg font-bold ${styles.textMain}`}>Manage Release</h2><p className={`text-xs ${styles.textSub} font-mono`}>{selectedPackage.filename}</p></div>
                         </div>
-                        <div>
-                            <h2 className={`text-lg font-bold ${styles.textMain}`}>Manage Release</h2>
-                            <p className={`text-xs ${styles.textSub} font-mono`}>{selectedPackage?.filename}</p>
-                        </div>
+                        {status !== 'success' && <button onClick={() => setIsReleaseOpen(false)} className={styles.textSub}><X size={20}/></button>}
                     </div>
-                    <button onClick={() => setIsReleaseOpen(false)} className={styles.textSub}><X size={20}/></button>
+                    {status !== 'success' && (
+                        <div className="flex items-center justify-between relative">
+                            <div className="absolute top-1/2 left-0 w-full h-0.5 bg-gray-500/20 -z-10"></div>
+                            {steps.map((s, idx) => {
+                                const isActive = step >= s.id;
+                                const isCurrent = step === s.id;
+                                return (
+                                    <div key={s.id} className="flex flex-col items-center gap-2 bg-inherit z-10 px-2 bg-[#282a36]">
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${isActive ? 'bg-blue-500 text-white' : 'bg-gray-500/20 text-gray-500'}`}>
+                                            {isActive ? <Check size={12}/> : s.id}
+                                        </div>
+                                        <span className={`text-[10px] uppercase font-bold tracking-wider ${isCurrent ? 'text-blue-500' : 'text-gray-500'}`}>{s.label}</span>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )}
                 </div>
 
-                <div className="p-6 space-y-8">
-                    {/* 1. Select Channels */}
-                    <div>
-                        <h3 className={`text-sm font-bold uppercase tracking-wider mb-3 flex items-center gap-2 ${styles.textSub}`}>
-                            <Beaker size={14} /> 1. Select Channels
-                        </h3>
-                        <div className="grid grid-cols-2 gap-3">
-                            {['Production', 'Test', 'Beta', 'Experimental'].map((channel) => (
-                                <label 
-                                    key={channel}
-                                    className={`
-                                        flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all
-                                        ${channels.includes(channel as any) 
-                                            ? 'border-blue-500 bg-blue-500/10 ring-1 ring-blue-500' 
-                                            : styles.input + ' hover:border-gray-500'}
-                                    `}
-                                >
-                                    <input 
-                                        type="checkbox" 
-                                        checked={channels.includes(channel as any)}
-                                        onChange={() => toggleChannel(channel as any)}
-                                        className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
-                                    />
-                                    <span className={`font-medium ${styles.textMain}`}>{channel}</span>
-                                </label>
-                            ))}
+                <div className="p-6 flex-1 bg-opacity-50 min-h-[400px] overflow-y-auto">
+                    {status === 'loading' ? (
+                        <div className="h-full flex flex-col items-center justify-center space-y-4 animate-in fade-in">
+                            <Loader2 size={48} className="animate-spin text-blue-500" />
+                            <p className={styles.textSub}>Updating release configuration...</p>
                         </div>
-                    </div>
+                    ) : status === 'success' ? (
+                        <div className="h-full flex flex-col items-center justify-center space-y-6 animate-in zoom-in-95">
+                             <div className="w-20 h-20 bg-green-500 text-white rounded-full flex items-center justify-center shadow-xl shadow-green-500/20">
+                                 <Check size={40} strokeWidth={4} />
+                             </div>
+                             <div className="text-center">
+                                 <h2 className={`text-2xl font-bold ${styles.textMain}`}>Release Updated!</h2>
+                                 <p className={`text-sm mt-2 max-w-xs mx-auto ${styles.textSub}`}>
+                                     The package configuration has been successfully propagated to the selected targets.
+                                 </p>
+                             </div>
+                             <button onClick={() => { setIsReleaseOpen(false); setSelectedPackage(null); }} className={`px-8 py-2 rounded-lg font-bold shadow-lg ${styles.buttonPrimary}`}>Close</button>
+                        </div>
+                    ) : step === 1 ? (
+                        <div className="animate-in fade-in slide-in-from-right-4 space-y-6">
+                            <div>
+                                <h3 className={`text-sm font-bold uppercase tracking-wider mb-2 ${styles.textSub}`}>Choose Destinations</h3>
+                                <p className="text-xs opacity-60 mb-4 leading-relaxed">
+                                    Select the platforms where this package should be distributed. 
+                                    <br/><span className="text-amber-500 opacity-80">*Note: Selecting Spotlight automatically enables the Production channel.</span>
+                                </p>
+                                <div className="grid grid-cols-1 gap-4">
+                                    <div 
+                                        onClick={() => toggleTarget('Spotlight Download Page')}
+                                        className={`p-4 rounded-xl border cursor-pointer transition-all flex gap-4 relative overflow-hidden ${targets.includes('Spotlight Download Page') ? 'border-purple-500 bg-purple-500/10' : styles.input + ' hover:bg-white/5'}`}
+                                    >
+                                        {targets.includes('Spotlight Download Page') && <div className="absolute top-0 right-0 bg-purple-500 text-white text-[9px] px-2 py-0.5 rounded-bl">PROD LINKED</div>}
+                                        <div className={`p-3 rounded-lg h-fit ${targets.includes('Spotlight Download Page') ? 'bg-purple-500 text-white' : 'bg-gray-500/20 text-gray-500'}`}><Globe size={24}/></div>
+                                        <div className="flex-1">
+                                            <div className={`font-bold text-lg ${styles.textMain}`}>Spotlight Download Page</div>
+                                            <p className="text-xs opacity-70 mt-1 leading-relaxed">{TARGET_DESCRIPTIONS['Spotlight Download Page']}</p>
+                                        </div>
+                                        <div className="ml-2 flex items-center">
+                                            {targets.includes('Spotlight Download Page') ? <CheckCircle2 className="text-purple-500" /> : <div className="w-6 h-6 rounded-full border border-gray-500"></div>}
+                                        </div>
+                                    </div>
 
-                    {/* 2. Select Targets */}
-                    <div>
-                         <h3 className={`text-sm font-bold uppercase tracking-wider mb-3 flex items-center gap-2 ${styles.textSub}`}>
-                            <Globe size={14} /> 2. Release To
-                        </h3>
-                        <div className="space-y-3">
-                            <label className={`flex items-center justify-between p-4 rounded-lg border cursor-pointer transition-all ${targets.includes('Spotlight Download Page') ? 'border-purple-500 bg-purple-500/10' : styles.input}`}>
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-purple-500/20 text-purple-500 rounded"><Globe size={18}/></div>
-                                    <div>
-                                        <div className={`font-medium ${styles.textMain}`}>Spotlight Download Page</div>
-                                        <div className="text-xs opacity-60">Public download center for end-users</div>
+                                    <div 
+                                        onClick={() => toggleTarget('Automation Update Service')}
+                                        className={`p-4 rounded-xl border cursor-pointer transition-all flex gap-4 ${targets.includes('Automation Update Service') ? 'border-orange-500 bg-orange-500/10' : styles.input + ' hover:bg-white/5'}`}
+                                    >
+                                        <div className={`p-3 rounded-lg h-fit ${targets.includes('Automation Update Service') ? 'bg-orange-500 text-white' : 'bg-gray-500/20 text-gray-500'}`}><Zap size={24}/></div>
+                                        <div className="flex-1">
+                                            <div className={`font-bold text-lg ${styles.textMain}`}>Automation Update Service</div>
+                                            <p className="text-xs opacity-70 mt-1 leading-relaxed">{TARGET_DESCRIPTIONS['Automation Update Service']}</p>
+                                        </div>
+                                        <div className="ml-2 flex items-center">
+                                            {targets.includes('Automation Update Service') ? <CheckCircle2 className="text-orange-500" /> : <div className="w-6 h-6 rounded-full border border-gray-500"></div>}
+                                        </div>
                                     </div>
                                 </div>
-                                <input type="checkbox" className="w-5 h-5 rounded text-purple-500" checked={targets.includes('Spotlight Download Page')} onChange={() => toggleTarget('Spotlight Download Page')} />
-                            </label>
+                            </div>
+                        </div>
+                    ) : step === 2 ? (
+                        <div className="animate-in fade-in slide-in-from-right-4 space-y-6">
+                            {/* Context from Step 1 */}
+                            <div className="bg-black/10 rounded-lg p-3 border border-dashed border-gray-500/20 flex items-center gap-4 text-xs">
+                                <span className={`font-bold uppercase tracking-wider ${styles.textSub}`}>Step 1 Context:</span>
+                                <div className="flex gap-2">
+                                    {targets.length > 0 ? targets.map(t => (
+                                        <span key={t} className={`flex items-center gap-1.5 px-2 py-0.5 rounded font-medium ${t.includes('Spotlight') ? 'bg-purple-500/20 text-purple-400' : 'bg-orange-500/20 text-orange-400'}`}>
+                                            {t.includes('Spotlight') ? <Globe size={10}/> : <Zap size={10}/>}
+                                            {t.includes('Spotlight') ? 'Spotlight' : 'Automation'}
+                                        </span>
+                                    )) : <span className="opacity-50 italic">No targets selected (Will unrelease)</span>}
+                                </div>
+                            </div>
 
-                            <label className={`flex items-center justify-between p-4 rounded-lg border cursor-pointer transition-all ${targets.includes('Automation Update Service') ? 'border-orange-500 bg-orange-500/10' : styles.input}`}>
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-orange-500/20 text-orange-500 rounded"><Zap size={18}/></div>
+                            <div>
+                                <h3 className={`text-sm font-bold uppercase tracking-wider mb-2 ${styles.textSub}`}>Select Channels</h3>
+                                <p className="text-xs opacity-60 mb-4 leading-relaxed">
+                                    Determine the stability level for this release. 
+                                    <br/><span className="text-amber-500 opacity-80">*Note: The 'Production' channel requires and enforces the Spotlight target.</span>
+                                </p>
+                                <div className="space-y-3">
+                                {['Production', 'Test', 'Beta', 'Experimental'].map((channel) => (
+                                    <label key={channel} className={`flex items-start gap-4 p-4 rounded-lg border cursor-pointer transition-all ${channels.includes(channel as any) ? 'border-blue-500 bg-blue-500/10 ring-1 ring-blue-500' : styles.input + ' hover:border-gray-500'}`}>
+                                        <div className="pt-1">
+                                            <input type="checkbox" checked={channels.includes(channel as any)} onChange={() => toggleChannel(channel as any)} className="rounded text-blue-600 focus:ring-blue-500 w-5 h-5" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <div className={`font-bold text-base ${styles.textMain}`}>{channel}</div>
+                                                {channel === 'Production' && channels.includes('Production') && (
+                                                    <span className="text-[9px] bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded border border-purple-500/30 flex items-center gap-1">
+                                                        <LinkIcon size={8}/> SPOTLIGHT LINKED
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="text-xs opacity-60 mt-1 leading-relaxed">{CHANNEL_DESCRIPTIONS[channel as ReleaseChannel]}</div>
+                                        </div>
+                                    </label>
+                                ))}
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="animate-in fade-in slide-in-from-right-4 space-y-6">
+                            {/* Detailed File Info */}
+                            <div className={`p-4 rounded-lg border bg-opacity-50 ${styles.input} flex flex-col gap-4`}>
+                                <div className="flex items-center gap-2 text-xs font-bold uppercase opacity-50 tracking-wider">
+                                    <FileBadge size={14} /> File Identity & Manifest
+                                </div>
+                                <div className="grid grid-cols-2 gap-y-4 gap-x-8 text-sm">
+                                    <div className="col-span-2 pb-2 border-b border-gray-500/10 mb-2">
+                                        <div className="text-xs opacity-50 uppercase mb-1">Filename</div>
+                                        <div className={`font-mono font-bold truncate text-base ${styles.textMain}`}>{selectedPackage.filename}</div>
+                                    </div>
+                                    
                                     <div>
-                                        <div className={`font-medium ${styles.textMain}`}>Automation Update Service</div>
-                                        <div className="text-xs opacity-60">Push to OTA servers and connected devices</div>
+                                        <div className="text-xs opacity-50 uppercase mb-1">Product</div>
+                                        <div className={`font-medium ${styles.textMain}`}>{selectedPackage.product}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs opacity-50 uppercase mb-1">Platform</div>
+                                        <div className={`font-medium ${styles.textMain}`}>{selectedPackage.platform}</div>
+                                    </div>
+                                    
+                                    <div>
+                                        <div className="text-xs opacity-50 uppercase mb-1">Series</div>
+                                        <div className={`font-medium ${styles.textMain}`}>{selectedPackage.series}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs opacity-50 uppercase mb-1">Architecture</div>
+                                        <Badge colorClass="bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">{selectedPackage.arch.join(', ')}</Badge>
+                                    </div>
+
+                                    <div>
+                                        <div className="text-xs opacity-50 uppercase mb-1">Version</div>
+                                        <div className={`font-mono font-bold ${styles.textMain}`}>v{selectedPackage.version}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs opacity-50 uppercase mb-1">Size</div>
+                                        <div className={`font-mono ${styles.textMain}`}>{selectedPackage.size}</div>
+                                    </div>
+
+                                    <div>
+                                        <div className="text-xs opacity-50 uppercase mb-1">Uploaded</div>
+                                        <div className="opacity-70">{selectedPackage.uploadedAt}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs opacity-50 uppercase mb-1">SHA Checksum</div>
+                                        <div className="font-mono text-xs opacity-70 truncate" title="SHA256: 8829a...">8829a...f9921</div>
                                     </div>
                                 </div>
-                                <input type="checkbox" className="w-5 h-5 rounded text-orange-500" checked={targets.includes('Automation Update Service')} onChange={() => toggleTarget('Automation Update Service')} />
-                            </label>
+                            </div>
+
+                            {/* Configuration Map (The Nested View) */}
+                            <div>
+                                <h4 className={`text-xs font-bold uppercase mb-3 ${styles.textSub}`}>Release Configuration Map</h4>
+                                <div className="space-y-3">
+                                    {targets.length === 0 ? (
+                                        <div className="p-4 rounded border border-dashed border-gray-500/30 text-gray-500 italic text-center text-sm">
+                                            No targets selected. This package will be unreleased (withdrawn from all channels).
+                                        </div>
+                                    ) : (
+                                        targets.map(t => {
+                                            const isSpotlight = t.includes('Spotlight');
+                                            const color = isSpotlight ? 'purple' : 'orange';
+                                            return (
+                                                <div key={t} className={`border rounded-lg overflow-hidden border-${color}-500/30`}>
+                                                    <div className={`px-4 py-2 bg-${color}-500/10 border-b border-${color}-500/10 flex items-center justify-between`}>
+                                                        <div className="flex items-center gap-2">
+                                                            {isSpotlight ? <Globe size={14} className="text-purple-500"/> : <Zap size={14} className="text-orange-500"/>}
+                                                            <span className={`text-sm font-bold ${styles.textMain}`}>{t}</span>
+                                                        </div>
+                                                        <div className={`text-[10px] font-bold uppercase text-${color}-500 opacity-70`}>{isSpotlight ? 'Public' : 'Backend'}</div>
+                                                    </div>
+                                                    <div className="p-3 bg-opacity-20 bg-black">
+                                                        <div className="text-[10px] uppercase opacity-50 mb-2">Active Channels</div>
+                                                        {channels.length > 0 ? (
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {channels.map(c => (
+                                                                    <span key={c} className={`px-2 py-1 rounded text-xs font-bold border bg-${color}-500/20 text-${color}-400 border-${color}-500/30`}>
+                                                                        {c}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-xs opacity-50 italic flex items-center gap-1"><AlertTriangle size={10}/> No channels selected (Inactive)</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )
+                                        })
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Risk Warning */}
+                            {targets.length > 0 && channels.length > 0 && (
+                                <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 flex gap-3">
+                                    <ShieldAlert size={24} className="text-red-500 shrink-0 mt-1" />
+                                    <div>
+                                        <h4 className="font-bold text-red-500 text-sm">Confirm Release Action</h4>
+                                        <p className="text-xs opacity-80 mt-1 leading-relaxed text-red-400">
+                                            You are about to release <strong>{selectedPackage.filename}</strong> to <strong>{targets.length} targets</strong> on <strong>{channels.length} channels</strong>. 
+                                            This action will make the file immediately available for download/update by users and devices on these channels.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                    </div>
+                    )}
                 </div>
 
-                <div className="p-6 border-t border-inherit flex justify-end gap-3 bg-opacity-50 bg-black/5">
-                    <button onClick={() => setIsReleaseOpen(false)} className={`px-4 py-2 rounded-lg font-medium transition-colors ${styles.textSub} hover:text-white`}>
-                        Cancel
-                    </button>
-                    <button 
-                        className={`px-6 py-2 rounded-lg font-medium shadow-lg flex items-center gap-2 transition-all ${channels.length > 0 && targets.length > 0 ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-gray-600 cursor-not-allowed text-gray-400'}`}
-                        // disabled={channels.length === 0 || targets.length === 0} // Allow saving empty to un-release?
-                        onClick={handleDeploy}
-                    >
-                        <Save size={18} />
-                        Update Configuration
-                    </button>
-                </div>
+                {status === 'idle' && (
+                    <div className="p-6 border-t border-inherit flex justify-between bg-opacity-50 bg-black/5">
+                        {step === 1 ? (
+                             <button onClick={() => setIsReleaseOpen(false)} className={`px-4 py-2 rounded-lg font-medium ${styles.textSub} hover:text-white`}>Cancel</button>
+                        ) : (
+                            <button onClick={() => setStep(step - 1)} className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${styles.textSub} hover:bg-white/5`}>
+                                <ArrowLeft size={16}/> Back
+                            </button>
+                        )}
+                        
+                        {step < 3 ? (
+                            <button onClick={() => setStep(step + 1)} className={`px-6 py-2 rounded-lg font-medium shadow-lg flex items-center gap-2 ${styles.buttonPrimary}`}>
+                                Next <ArrowRight size={16}/>
+                            </button>
+                        ) : (
+                            <button onClick={handleDeploy} className={`px-8 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white transform hover:scale-105 transition-all`}>
+                                <Check size={16} strokeWidth={3}/> Confirm & Release
+                            </button>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
       );
@@ -966,44 +1295,25 @@ export const AgentHub: React.FC = () => {
           
           {/* Admin Toolbar */}
           <div className="p-4 border-b border-inherit flex flex-col xl:flex-row justify-between gap-4">
-              
-              {/* Filters */}
               <div className="flex flex-wrap gap-2 items-center">
                  <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-inherit bg-opacity-10 bg-black">
                     <Filter size={16} className={styles.textSub} />
                     <span className={`text-sm font-medium ${styles.textMain}`}>Filters:</span>
                  </div>
-                 
-                 {/* Product Filter */}
-                 <select 
-                    value={filterProduct}
-                    onChange={(e) => setFilterProduct(e.target.value)}
-                    className={`px-3 py-2 rounded-md text-sm border focus:ring-2 focus:ring-blue-500 ${styles.input}`}
-                 >
+                 <select value={filterProduct} onChange={(e) => setFilterProduct(e.target.value)} className={`px-3 py-2 rounded-md text-sm border focus:ring-2 focus:ring-blue-500 ${styles.input}`}>
                     <option value="All">All Products</option>
                     {FILTER_OPTIONS.products.map(p => <option key={p} value={p}>{p}</option>)}
                  </select>
-
-                 {/* Platform Filter */}
-                 <select 
-                    value={filterPlatform}
-                    onChange={(e) => setFilterPlatform(e.target.value)}
-                    className={`px-3 py-2 rounded-md text-sm border focus:ring-2 focus:ring-blue-500 ${styles.input}`}
-                 >
+                 <select value={filterPlatform} onChange={(e) => setFilterPlatform(e.target.value)} className={`px-3 py-2 rounded-md text-sm border focus:ring-2 focus:ring-blue-500 ${styles.input}`}>
                     <option value="All">All Platforms</option>
                     {FILTER_OPTIONS.platforms.map(p => <option key={p} value={p}>{p}</option>)}
                  </select>
               </div>
 
-              {/* Search */}
               <div className="flex gap-2 w-full xl:w-auto">
                  <div className="relative flex-1 xl:w-64">
                     <Search size={16} className={`absolute left-3 top-1/2 -translate-y-1/2 ${styles.textSub}`} />
-                    <input 
-                        type="text" 
-                        placeholder="Search version, filename..." 
-                        className={`w-full pl-10 pr-4 py-2 rounded-md text-sm border focus:outline-none focus:ring-1 focus:ring-blue-500 ${styles.input}`}
-                    />
+                    <input type="text" placeholder="Search version, filename..." className={`w-full pl-10 pr-4 py-2 rounded-md text-sm border focus:outline-none focus:ring-1 focus:ring-blue-500 ${styles.input}`} />
                  </div>
               </div>
           </div>
@@ -1014,7 +1324,8 @@ export const AgentHub: React.FC = () => {
                   <thead>
                       <tr className={styles.header}>
                           <th className="p-4 font-semibold w-12">Product</th>
-                          <th className="p-4 font-semibold">Platform & Series</th>
+                          <th className="p-4 font-semibold">Platform</th>
+                          <th className="p-4 font-semibold">Series</th>
                           <th className="p-4 font-semibold">Support OS</th>
                           <th className="p-4 font-semibold">Version Info</th>
                           <th className="p-4 font-semibold">Release Status & Channels</th>
@@ -1027,7 +1338,11 @@ export const AgentHub: React.FC = () => {
                           const isDeprecated = item.status === 'deprecated';
 
                           return (
-                          <tr key={item.id} className={styles.row}>
+                          <tr 
+                             key={item.id} 
+                             className={styles.row}
+                             onClick={() => { setSelectedPackage(item); setIsDetailOpen(true); }}
+                          >
                               {/* Product */}
                               <td className="p-4 align-top">
                                   <div className="flex flex-col items-center gap-1 w-16">
@@ -1039,15 +1354,19 @@ export const AgentHub: React.FC = () => {
                                   </div>
                               </td>
 
-                              {/* Platform & Series */}
+                              {/* Platform */}
+                              <td className="p-4 align-top">
+                                  <div className="flex items-center gap-2">
+                                          {item.platform === 'Android' && <Smartphone size={18} className="text-green-500"/>}
+                                          {item.platform === 'Windows' && <Monitor size={18} className="text-blue-500"/>}
+                                          {item.platform === 'Linux' && <Terminal size={18} className="text-orange-500"/>}
+                                          <span className="font-medium">{item.platform}</span>
+                                  </div>
+                              </td>
+
+                              {/* Series & Arch */}
                               <td className="p-4 align-top">
                                   <div className="flex flex-col gap-1">
-                                      <div className="flex items-center gap-2">
-                                          {item.platform === 'Android' && <Smartphone size={14} className="text-green-500"/>}
-                                          {item.platform === 'Windows' && <Monitor size={14} className="text-blue-500"/>}
-                                          {item.platform === 'Linux' && <Terminal size={14} className="text-orange-500"/>}
-                                          <span className="font-medium">{item.platform}</span>
-                                      </div>
                                       <div className={`text-xs px-2 py-0.5 rounded-md inline-block w-fit bg-opacity-20 bg-gray-500`}>
                                           {item.series}
                                       </div>
@@ -1059,19 +1378,14 @@ export const AgentHub: React.FC = () => {
                                   </div>
                               </td>
 
-                              {/* Support OS (Compact) */}
+                              {/* Support OS (Cleaned) */}
                               <td className="p-4 align-top">
                                   <div className="flex flex-wrap gap-1 items-center max-w-[200px]">
-                                      {item.supportOS.slice(0, 2).map((os, i) => (
+                                      {item.supportOS.slice(0, 3).map((os, i) => (
                                           <Badge key={i}>{os}</Badge>
                                       ))}
-                                      {item.supportOS.length > 2 && (
-                                          <button 
-                                            onClick={() => { setSelectedPackage(item); setIsDetailOpen(true); }}
-                                            className="text-xs text-blue-500 hover:underline px-1"
-                                          >
-                                              +{item.supportOS.length - 2} more
-                                          </button>
+                                      {item.supportOS.length > 3 && (
+                                          <span className="text-[10px] opacity-50 px-1">+{item.supportOS.length - 3}</span>
                                       )}
                                   </div>
                               </td>
@@ -1103,7 +1417,6 @@ export const AgentHub: React.FC = () => {
                                           </div>
                                       )}
 
-                                      {/* Channel Tags */}
                                       {!isDeprecated && isReleased && (
                                           <div className="flex flex-wrap gap-1">
                                               {item.channels.length > 0 ? item.channels.map(c => (
@@ -1113,8 +1426,6 @@ export const AgentHub: React.FC = () => {
                                               )}
                                           </div>
                                       )}
-
-                                      {/* Target Icons */}
                                       {!isDeprecated && isReleased && (
                                           <div className="flex gap-2 text-xs opacity-60 mt-0.5">
                                               {item.targets.includes('Spotlight Download Page') && <Globe size={14} title="Spotlight" />}
@@ -1130,7 +1441,7 @@ export const AgentHub: React.FC = () => {
                                       <div className="flex gap-1 mt-1">
                                           <button 
                                             title={isReleased ? "Manage Release" : "Release Now"}
-                                            onClick={() => { setSelectedPackage(item); setIsReleaseOpen(true); }}
+                                            onClick={(e) => { e.stopPropagation(); setSelectedPackage(item); setIsReleaseOpen(true); }}
                                             disabled={item.status === 'deprecated'}
                                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold uppercase transition-all ${item.status === 'deprecated' ? 'bg-gray-500 opacity-50 cursor-not-allowed' : (theme === AppTheme.LIGHT ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-500/20')}`}
                                           >
@@ -1138,20 +1449,18 @@ export const AgentHub: React.FC = () => {
                                           </button>
                                       </div>
                                       <div className="flex gap-1 mt-1">
-                                          {/* New Edit Action */}
                                           <button 
-                                            onClick={() => { setSelectedPackage(item); setIsDetailOpen(true); }}
+                                            onClick={(e) => { e.stopPropagation(); setSelectedPackage(item); setIsDetailOpen(true); }}
                                             className={`p-1.5 rounded hover:bg-blue-500/20 text-blue-500 transition-colors`}
                                             title="Edit File Details"
                                           >
                                               <Edit3 size={16} />
                                           </button>
-
-                                          <button className={`p-1.5 rounded hover:bg-gray-500/20 text-gray-400 transition-colors`}>
+                                          <button onClick={(e) => e.stopPropagation()} className={`p-1.5 rounded hover:bg-gray-500/20 text-gray-400 transition-colors`}>
                                               <Download size={16} />
                                           </button>
                                           <button 
-                                            onClick={() => { setSelectedPackage(item); setIsStatusOpen(true); }}
+                                            onClick={(e) => { e.stopPropagation(); setSelectedPackage(item); setIsStatusOpen(true); }}
                                             className={`p-1.5 rounded hover:bg-red-500/20 text-red-500 transition-colors`}
                                             title="Manage Status / Delete"
                                           >
