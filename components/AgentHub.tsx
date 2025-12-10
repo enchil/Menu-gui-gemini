@@ -48,7 +48,11 @@ import {
   ShieldAlert,
   Loader2,
   FileBadge,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Building2,
+  Lock,
+  FileCode,
+  HelpCircle
 } from 'lucide-react';
 
 // --- Types ---
@@ -174,6 +178,13 @@ const FILTER_OPTIONS = {
   platforms: ['Android', 'Windows', 'Linux'],
   archs: ['x86', 'x86_64', 'arm', 'arm64'],
 };
+
+const MOCK_CUSTOMERS = [
+    'RetailCorp', 
+    'FastFood Chain A', 
+    'Bank of Innovation', 
+    'Gov Dept'
+];
 
 const CHANNEL_DESCRIPTIONS: Record<ReleaseChannel, string> = {
     'Production': 'Stable release for all end-users. Requires Spotlight target to be active.',
@@ -307,15 +318,13 @@ export const AgentHub: React.FC = () => {
     </span>
   );
 
-  // --- STATUS / DELETE MODAL ---
+  // ... (StatusManagementModal and DetailEditModal kept as is) ...
   const StatusManagementModal = () => {
-    // ... (Existing Implementation kept intact)
     if (!selectedPackage) return null;
     const [confirmAction, setConfirmAction] = useState<'revert' | 'deprecate' | 'delete' | null>(null);
 
     const executeAction = () => {
         if (!confirmAction) return;
-        
         const idx = MOCK_RELEASES.findIndex(r => r.id === selectedPackage.id);
         if (idx !== -1) {
             if (confirmAction === 'delete') {
@@ -345,7 +354,6 @@ export const AgentHub: React.FC = () => {
     return (
         <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${styles.modalOverlay}`}>
             <div className={`w-full max-w-md rounded-xl shadow-2xl border p-6 flex flex-col ${styles.modalBg}`}>
-                
                 {confirmAction ? (
                      <div className="space-y-6 animate-in zoom-in-95 duration-200">
                          <div className="flex flex-col items-center text-center">
@@ -375,43 +383,20 @@ export const AgentHub: React.FC = () => {
                                 </p>
                             </div>
                         </div>
-
                         <div className="space-y-3 mb-6">
-                            <button 
-                                onClick={() => setConfirmAction('revert')}
-                                className={`w-full p-4 rounded-lg border text-left flex items-center gap-3 transition-colors hover:bg-gray-500/10 border-gray-500/30`}
-                            >
+                            <button onClick={() => setConfirmAction('revert')} className={`w-full p-4 rounded-lg border text-left flex items-center gap-3 transition-colors hover:bg-gray-500/10 border-gray-500/30`}>
                                 <div className="p-2 bg-gray-500/20 text-gray-400 rounded-full"><RotateCcw size={18}/></div>
-                                <div>
-                                    <div className={`font-bold ${styles.textMain}`}>Revert to "Not Released"</div>
-                                    <div className={`text-xs ${styles.textSub}`}>Clear all channels and targets. Files remain in storage.</div>
-                                </div>
+                                <div><div className={`font-bold ${styles.textMain}`}>Revert to "Not Released"</div><div className={`text-xs ${styles.textSub}`}>Clear all channels and targets. Files remain in storage.</div></div>
                             </button>
-
-                            <button 
-                                onClick={() => setConfirmAction('deprecate')}
-                                className={`w-full p-4 rounded-lg border text-left flex items-center gap-3 transition-colors ${selectedPackage.status === 'deprecated' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-amber-500/10 border-amber-500/30'}`}
-                                disabled={selectedPackage.status === 'deprecated'}
-                            >
+                            <button onClick={() => setConfirmAction('deprecate')} className={`w-full p-4 rounded-lg border text-left flex items-center gap-3 transition-colors ${selectedPackage.status === 'deprecated' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-amber-500/10 border-amber-500/30'}`} disabled={selectedPackage.status === 'deprecated'}>
                                 <div className="p-2 bg-amber-500/20 text-amber-500 rounded-full"><Ban size={18}/></div>
-                                <div>
-                                    <div className={`font-bold ${styles.textMain}`}>Deprecate Release</div>
-                                    <div className={`text-xs ${styles.textSub}`}>Mark as obsolete. Prevents new downloads but keeps history.</div>
-                                </div>
+                                <div><div className={`font-bold ${styles.textMain}`}>Deprecate Release</div><div className={`text-xs ${styles.textSub}`}>Mark as obsolete. Prevents new downloads but keeps history.</div></div>
                             </button>
-
-                            <button 
-                                onClick={() => setConfirmAction('delete')}
-                                className={`w-full p-4 rounded-lg border text-left flex items-center gap-3 transition-colors hover:bg-red-500/10 border-red-500/30 group`}
-                            >
+                            <button onClick={() => setConfirmAction('delete')} className={`w-full p-4 rounded-lg border text-left flex items-center gap-3 transition-colors hover:bg-red-500/10 border-red-500/30 group`}>
                                 <div className="p-2 bg-red-500/20 text-red-500 rounded-full group-hover:bg-red-500 group-hover:text-white transition-colors"><Trash2 size={18}/></div>
-                                <div>
-                                    <div className={`font-bold text-red-500`}>Delete Permanently</div>
-                                    <div className={`text-xs ${styles.textSub}`}>Remove this file and all associated metadata. Cannot be undone.</div>
-                                </div>
+                                <div><div className={`font-bold text-red-500`}>Delete Permanently</div><div className={`text-xs ${styles.textSub}`}>Remove this file and all associated metadata. Cannot be undone.</div></div>
                             </button>
                         </div>
-
                         <div className="flex justify-end">
                             <button onClick={() => setIsStatusOpen(false)} className={`px-4 py-2 rounded font-medium ${styles.textSub} hover:text-white`}>Cancel</button>
                         </div>
@@ -422,12 +407,8 @@ export const AgentHub: React.FC = () => {
     );
   };
 
-
-  // --- DETAIL & EDIT MODAL ---
   const DetailEditModal = () => {
-    // ... (Existing Implementation)
     if (!selectedPackage) return null;
-    
     const [isEditing, setIsEditing] = useState(false);
     const [activeTab, setActiveTab] = useState<'general' | 'compat' | 'activity'>('general');
     const [editForm, setEditForm] = useState(selectedPackage);
@@ -454,19 +435,10 @@ export const AgentHub: React.FC = () => {
     };
 
     const handleSave = () => {
-        const newLog: ActivityLog = {
-            id: `a-${Date.now()}`,
-            user: 'current_admin',
-            action: 'Updated package details',
-            timestamp: new Date().toLocaleString()
-        };
-        
+        const newLog: ActivityLog = { id: `a-${Date.now()}`, user: 'current_admin', action: 'Updated package details', timestamp: new Date().toLocaleString() };
         const index = MOCK_RELEASES.findIndex(r => r.id === selectedPackage.id);
         if (index !== -1) {
-            MOCK_RELEASES[index] = {
-                ...editForm,
-                activityLog: [newLog, ...editForm.activityLog]
-            };
+            MOCK_RELEASES[index] = { ...editForm, activityLog: [newLog, ...editForm.activityLog] };
         }
         setIsEditing(false);
         setIsDetailOpen(false);
@@ -475,90 +447,24 @@ export const AgentHub: React.FC = () => {
     return (
       <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${styles.modalOverlay}`}>
           <div className={`w-full max-w-4xl rounded-xl shadow-2xl border flex flex-col h-[80vh] ${styles.modalBg}`}>
-              {/* Header */}
               <div className="p-6 border-b border-inherit flex justify-between items-start">
                   <div className="flex items-start gap-4">
-                      <div className={`p-3 rounded-lg ${theme === AppTheme.LIGHT ? 'bg-blue-100 text-blue-600' : 'bg-blue-500/20 text-blue-400'}`}>
-                          <Package size={24} />
-                      </div>
+                      <div className={`p-3 rounded-lg ${theme === AppTheme.LIGHT ? 'bg-blue-100 text-blue-600' : 'bg-blue-500/20 text-blue-400'}`}><Package size={24} /></div>
                       <div>
-                          <h2 className={`text-xl font-bold ${styles.textMain} flex items-center gap-2`}>
-                              {editForm.filename}
-                              {editForm.status === 'deprecated' ? (
-                                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-500 border border-red-500/20">Deprecated</span>
-                              ) : (
-                                  editForm.targets.length > 0 
-                                  ? <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 border border-green-500/20">Released</span>
-                                  : <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-gray-500/20 text-gray-500 border border-gray-500/20">Not Released</span>
-                              )}
-                          </h2>
-                          <div className={`flex items-center gap-4 text-xs mt-1 ${styles.textSub}`}>
-                              <span className="flex items-center gap-1"><Monitor size={12}/> {editForm.platform} / {editForm.series}</span>
-                              <span className="flex items-center gap-1"><Cpu size={12}/> {editForm.arch.join(', ')}</span>
-                              <span className="flex items-center gap-1"><Clock size={12}/> {editForm.uploadedAt}</span>
-                          </div>
+                          <h2 className={`text-xl font-bold ${styles.textMain} flex items-center gap-2`}>{editForm.filename}{editForm.status === 'deprecated' ? <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-500 border border-red-500/20">Deprecated</span> : (editForm.targets.length > 0 ? <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 border border-green-500/20">Released</span> : <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-gray-500/20 text-gray-500 border border-gray-500/20">Not Released</span>)}</h2>
+                          <div className={`flex items-center gap-4 text-xs mt-1 ${styles.textSub}`}><span className="flex items-center gap-1"><Monitor size={12}/> {editForm.platform} / {editForm.series}</span><span className="flex items-center gap-1"><Cpu size={12}/> {editForm.arch.join(', ')}</span><span className="flex items-center gap-1"><Clock size={12}/> {editForm.uploadedAt}</span></div>
                       </div>
                   </div>
                   <div className="flex items-center gap-2">
-                      {!isEditing ? (
-                          <button onClick={() => setIsEditing(true)} className={`px-3 py-1.5 text-sm rounded-md border flex items-center gap-2 hover:bg-opacity-10 hover:bg-blue-500 transition-colors ${styles.textMain} border-inherit`}><Edit3 size={14} /> Edit Details</button>
-                      ) : (
-                          <div className="flex gap-2">
-                              <button onClick={() => { setIsEditing(false); setEditForm(selectedPackage); }} className="px-3 py-1.5 text-sm rounded-md border border-red-500/30 text-red-500 hover:bg-red-500/10">Cancel</button>
-                              <button onClick={handleSave} className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-2 ${styles.buttonPrimary}`}><Save size={14} /> Save Changes</button>
-                          </div>
-                      )}
+                      {!isEditing ? <button onClick={() => setIsEditing(true)} className={`px-3 py-1.5 text-sm rounded-md border flex items-center gap-2 hover:bg-opacity-10 hover:bg-blue-500 transition-colors ${styles.textMain} border-inherit`}><Edit3 size={14} /> Edit Details</button> : <div className="flex gap-2"><button onClick={() => { setIsEditing(false); setEditForm(selectedPackage); }} className="px-3 py-1.5 text-sm rounded-md border border-red-500/30 text-red-500 hover:bg-red-500/10">Cancel</button><button onClick={handleSave} className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-2 ${styles.buttonPrimary}`}><Save size={14} /> Save Changes</button></div>}
                       <button onClick={() => setIsDetailOpen(false)} className={`p-2 hover:text-red-500 transition-colors ${styles.textSub}`}><X size={20} /></button>
                   </div>
               </div>
-
-              {/* Tabs */}
-              <div className={`flex px-6 border-b border-inherit gap-6 ${styles.textSub}`}>
-                  <button onClick={() => setActiveTab('general')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'general' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>General & Docs</button>
-                  <button onClick={() => setActiveTab('compat')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'compat' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>Compatibility</button>
-                  <button onClick={() => setActiveTab('activity')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'activity' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>File Activity</button>
-              </div>
-
-              {/* Content */}
+              <div className={`flex px-6 border-b border-inherit gap-6 ${styles.textSub}`}><button onClick={() => setActiveTab('general')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'general' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>General & Docs</button><button onClick={() => setActiveTab('compat')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'compat' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>Compatibility</button><button onClick={() => setActiveTab('activity')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'activity' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>File Activity</button></div>
               <div className="flex-1 overflow-y-auto p-6 bg-opacity-50">
-                  {activeTab === 'general' && (
-                      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-                          <div className={`p-4 rounded border ${theme === AppTheme.LIGHT ? 'bg-gray-50 border-gray-200' : 'bg-black/20 border-white/10'}`}>
-                              <h4 className={`text-xs font-bold uppercase mb-3 ${styles.textSub}`}>Release Configuration</h4>
-                              <div className="grid grid-cols-2 gap-4">
-                                  <div>
-                                      <div className="text-[10px] opacity-60 mb-1">ACTIVE CHANNELS</div>
-                                      <div className="flex flex-wrap gap-2">
-                                          {editForm.channels.length > 0 ? editForm.channels.map(c => <Badge key={c} colorClass="bg-blue-500/20 text-blue-400 border border-blue-500/30">{c}</Badge>) : <span className="text-sm opacity-50 italic">None</span>}
-                                      </div>
-                                  </div>
-                                  <div>
-                                      <div className="text-[10px] opacity-60 mb-1">RELEASE TARGETS</div>
-                                      <div className="space-y-1">
-                                          {editForm.targets.length > 0 ? editForm.targets.map(t => <div key={t} className="flex items-center gap-2 text-sm font-medium">{t.includes('Spotlight') ? <Globe size={14} className="text-purple-400"/> : <Zap size={14} className="text-orange-400"/>}<span>{t}</span></div>) : <span className="text-sm opacity-50 italic">Not Released</span>}
-                                      </div>
-                                  </div>
-                              </div>
-                          </div>
-                          <div className="space-y-2"><label className={`text-xs font-bold uppercase tracking-wider ${styles.textSub}`}>Description</label>{isEditing ? <input className={`w-full p-2 rounded border outline-none focus:ring-1 focus:ring-blue-500 ${styles.input}`} value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} /> : <p className={`${styles.textMain} text-sm`}>{editForm.description || <span className="opacity-50 italic">No description provided.</span>}</p>}</div>
-                          <div className="space-y-2"><label className={`text-xs font-bold uppercase tracking-wider ${styles.textSub}`}>Release Notes</label>{isEditing ? <textarea className={`w-full h-48 p-4 rounded border outline-none focus:ring-1 focus:ring-blue-500 font-mono text-sm ${styles.input}`} value={editForm.releaseNotes} onChange={e => setEditForm({...editForm, releaseNotes: e.target.value})} /> : <div className={`w-full p-4 rounded border font-mono text-sm whitespace-pre-wrap ${styles.input} bg-opacity-50`}>{editForm.releaseNotes || <span className="opacity-50 italic">No notes available.</span>}</div>}</div>
-                      </div>
-                  )}
-                  {activeTab === 'compat' && (
-                      <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 h-full flex flex-col">
-                          <div className="flex justify-between items-center"><h3 className={`font-bold ${styles.textMain}`}>Supported OS Targets</h3><div className={`text-xs ${styles.textSub}`}>{editForm.supportOS.length} targets selected</div></div>
-                          {isEditing ? (
-                              <div className={`flex-1 overflow-y-auto border rounded-md p-2 ${styles.input}`}>
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">{availableTargets.map(t => { const isSelected = editForm.supportOS.includes(t.name); return (<div key={t.id} onClick={() => toggleOsSupport(t.name)} className={`p-3 rounded border cursor-pointer flex items-center gap-3 select-none transition-colors ${isSelected ? 'bg-blue-500/10 border-blue-500 ring-1 ring-blue-500/50' : 'border-transparent hover:bg-gray-500/10'}`}><div className={`w-4 h-4 rounded border flex items-center justify-center ${isSelected ? 'bg-blue-500 border-blue-500 text-white' : 'border-gray-500'}`}>{isSelected && <Check size={10} />}</div><div><div className={`text-sm font-medium ${styles.textMain}`}>{t.name}</div><div className="text-xs opacity-50 font-mono">{t.code}</div></div></div>); })}</div>
-                              </div>
-                          ) : (
-                              <div className={`flex-1 overflow-y-auto border rounded-md ${styles.input}`}>{editForm.supportOS.length > 0 ? (<table className="w-full text-left text-sm"><thead className="bg-black/10"><tr><th className="p-3 font-semibold text-xs uppercase opacity-70">Target Name</th><th className="p-3 font-semibold text-xs uppercase opacity-70">Status</th></tr></thead><tbody>{editForm.supportOS.map((os, i) => (<tr key={i} className="border-b border-inherit last:border-0 hover:bg-white/5"><td className="p-3 font-medium flex items-center gap-2"><Monitor size={14} className="opacity-50"/> {os}</td><td className="p-3"><span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 border border-green-500/20">Verified</span></td></tr>))}</tbody></table>) : <div className="p-8 text-center opacity-50"><AlertTriangle size={24} className="mx-auto mb-2"/><p>No OS targets specified.</p></div>}</div>
-                          )}
-                      </div>
-                  )}
-                  {activeTab === 'activity' && (
-                       <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2"><div className="relative pl-4 space-y-6"><div className="absolute left-0 top-2 bottom-2 w-0.5 bg-gray-500/20"></div>{editForm.activityLog && editForm.activityLog.length > 0 ? editForm.activityLog.map((log, index) => (<div key={log.id} className="relative pl-6"><div className={`absolute left-[-5px] top-1 w-2.5 h-2.5 rounded-full border-2 ${theme === AppTheme.LIGHT ? 'bg-white border-blue-500' : 'bg-slate-800 border-blue-400'} z-10`}></div><div className="flex flex-col"><span className={`text-sm font-medium ${styles.textMain}`}>{log.action}</span><div className="flex items-center gap-2 text-xs opacity-60 mt-1"><span className="flex items-center gap-1"><User size={10}/> {log.user}</span><span>•</span><span className="flex items-center gap-1"><Calendar size={10}/> {log.timestamp}</span></div></div></div>)) : <p className="text-sm opacity-50 italic pl-6">No activity recorded.</p>}</div></div>
-                  )}
+                  {activeTab === 'general' && <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2"><div className={`p-4 rounded border ${theme === AppTheme.LIGHT ? 'bg-gray-50 border-gray-200' : 'bg-black/20 border-white/10'}`}><h4 className={`text-xs font-bold uppercase mb-3 ${styles.textSub}`}>Release Configuration</h4><div className="grid grid-cols-2 gap-4"><div><div className="text-[10px] opacity-60 mb-1">ACTIVE CHANNELS</div><div className="flex flex-wrap gap-2">{editForm.channels.length > 0 ? editForm.channels.map(c => <Badge key={c} colorClass="bg-blue-500/20 text-blue-400 border border-blue-500/30">{c}</Badge>) : <span className="text-sm opacity-50 italic">None</span>}</div></div><div><div className="text-[10px] opacity-60 mb-1">RELEASE TARGETS</div><div className="space-y-1">{editForm.targets.length > 0 ? editForm.targets.map(t => <div key={t} className="flex items-center gap-2 text-sm font-medium">{t.includes('Spotlight') ? <Globe size={14} className="text-purple-400"/> : <Zap size={14} className="text-orange-400"/>}<span>{t}</span></div>) : <span className="text-sm opacity-50 italic">Not Released</span>}</div></div></div></div><div className="space-y-2"><label className={`text-xs font-bold uppercase tracking-wider ${styles.textSub}`}>Description</label>{isEditing ? <input className={`w-full p-2 rounded border outline-none focus:ring-1 focus:ring-blue-500 ${styles.input}`} value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} /> : <p className={`${styles.textMain} text-sm`}>{editForm.description || <span className="opacity-50 italic">No description provided.</span>}</p>}</div><div className="space-y-2"><label className={`text-xs font-bold uppercase tracking-wider ${styles.textSub}`}>Release Notes</label>{isEditing ? <textarea className={`w-full h-48 p-4 rounded border outline-none focus:ring-1 focus:ring-blue-500 font-mono text-sm ${styles.input}`} value={editForm.releaseNotes} onChange={e => setEditForm({...editForm, releaseNotes: e.target.value})} /> : <div className={`w-full p-4 rounded border font-mono text-sm whitespace-pre-wrap ${styles.input} bg-opacity-50`}>{editForm.releaseNotes || <span className="opacity-50 italic">No notes available.</span>}</div>}</div></div>}
+                  {activeTab === 'compat' && <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 h-full flex flex-col"><div className="flex justify-between items-center"><h3 className={`font-bold ${styles.textMain}`}>Supported OS Targets</h3><div className={`text-xs ${styles.textSub}`}>{editForm.supportOS.length} targets selected</div></div>{isEditing ? <div className={`flex-1 overflow-y-auto border rounded-md p-2 ${styles.input}`}><div className="grid grid-cols-1 md:grid-cols-2 gap-2">{availableTargets.map(t => { const isSelected = editForm.supportOS.includes(t.name); return (<div key={t.id} onClick={() => toggleOsSupport(t.name)} className={`p-3 rounded border cursor-pointer flex items-center gap-3 select-none transition-colors ${isSelected ? 'bg-blue-500/10 border-blue-500 ring-1 ring-blue-500/50' : 'border-transparent hover:bg-gray-500/10'}`}><div className={`w-4 h-4 rounded border flex items-center justify-center ${isSelected ? 'bg-blue-500 border-blue-500 text-white' : 'border-gray-500'}`}>{isSelected && <Check size={10} />}</div><div><div className={`text-sm font-medium ${styles.textMain}`}>{t.name}</div><div className="text-xs opacity-50 font-mono">{t.code}</div></div></div>); })}</div></div> : <div className={`flex-1 overflow-y-auto border rounded-md ${styles.input}`}>{editForm.supportOS.length > 0 ? (<table className="w-full text-left text-sm"><thead className="bg-black/10"><tr><th className="p-3 font-semibold text-xs uppercase opacity-70">Target Name</th><th className="p-3 font-semibold text-xs uppercase opacity-70">Status</th></tr></thead><tbody>{editForm.supportOS.map((os, i) => (<tr key={i} className="border-b border-inherit last:border-0 hover:bg-white/5"><td className="p-3 font-medium flex items-center gap-2"><Monitor size={14} className="opacity-50"/> {os}</td><td className="p-3"><span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 border border-green-500/20">Verified</span></td></tr>))}</tbody></table>) : <div className="p-8 text-center opacity-50"><AlertTriangle size={24} className="mx-auto mb-2"/><p>No OS targets specified.</p></div>}</div>}</div>}
+                  {activeTab === 'activity' && <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2"><div className="relative pl-4 space-y-6"><div className="absolute left-0 top-2 bottom-2 w-0.5 bg-gray-500/20"></div>{editForm.activityLog && editForm.activityLog.length > 0 ? editForm.activityLog.map((log, index) => (<div key={log.id} className="relative pl-6"><div className={`absolute left-[-5px] top-1 w-2.5 h-2.5 rounded-full border-2 ${theme === AppTheme.LIGHT ? 'bg-white border-blue-500' : 'bg-slate-800 border-blue-400'} z-10`}></div><div className="flex flex-col"><span className={`text-sm font-medium ${styles.textMain}`}>{log.action}</span><div className="flex items-center gap-2 text-xs opacity-60 mt-1"><span className="flex items-center gap-1"><User size={10}/> {log.user}</span><span>•</span><span className="flex items-center gap-1"><Calendar size={10}/> {log.timestamp}</span></div></div></div>)) : <p className="text-sm opacity-50 italic pl-6">No activity recorded.</p>}</div></div>}
               </div>
           </div>
       </div>
@@ -568,12 +474,15 @@ export const AgentHub: React.FC = () => {
 
   // --- WIZARD COMPONENT ---
   const UploadWizard = () => {
-    // ... (Steps 1 & 4 modified below to match logic)
     const [step, setStep] = useState(1);
     const [isSuccess, setIsSuccess] = useState(false);
     const [file, setFile] = useState<File | null>(null);
     const [isPreviewMode, setIsPreviewMode] = useState(false);
+    
+    // Updated State
     const [formData, setFormData] = useState({
+      releaseType: 'Generic' as 'Generic' | 'Customized',
+      selectedCustomer: '',
       product: 'Agent',
       platform: 'Android',
       series: 'Universal',
@@ -588,10 +497,29 @@ export const AgentHub: React.FC = () => {
       description: '',
       selectedTargets: [] as string[]
     });
-    const [isCustomSeriesMode, setIsCustomSeriesMode] = useState(false);
-    const steps = [{ id: 1, label: 'MANIFEST' }, { id: 2, label: 'COMPATIBILITY' }, { id: 3, label: 'UPLOAD' }, { id: 4, label: 'DOCS' }];
     
-    // Effects ...
+    const [isCustomSeriesMode, setIsCustomSeriesMode] = useState(false);
+    const steps = [
+        { id: 1, label: 'SCOPE' },
+        { id: 2, label: 'MANIFEST' }, 
+        { id: 3, label: 'COMPATIBILITY' }, 
+        { id: 4, label: 'UPLOAD' }, 
+        { id: 5, label: 'DOCS' },
+        { id: 6, label: 'REVIEW' }
+    ];
+    
+    // Helper to get series based on scope
+    const getAvailableSeries = () => {
+        let list = getSeriesForPlatform(formData.platform, formData.product);
+        if (formData.releaseType === 'Customized' && formData.selectedCustomer) {
+            if (formData.selectedCustomer === 'RetailCorp') return list.filter(s => s.includes('GMS') || s === 'Universal');
+            if (formData.selectedCustomer === 'FastFood Chain A') return list.filter(s => s === 'Aura' || s === 'Universal');
+            return list; 
+        }
+        return list;
+    };
+
+    // Effects
     useEffect(() => {
         const validPlatforms = getPlatformsForProduct(formData.product);
         if (!validPlatforms.includes(formData.platform)) setFormData(prev => ({ ...prev, platform: validPlatforms[0] }));
@@ -599,9 +527,9 @@ export const AgentHub: React.FC = () => {
     
     useEffect(() => {
         setIsCustomSeriesMode(false);
-        const validSeries = getSeriesForPlatform(formData.platform, formData.product);
-        if (!validSeries.includes(formData.series)) setFormData(prev => ({ ...prev, series: validSeries[0], customSeries: '' }));
-    }, [formData.platform, formData.product]);
+        const validSeries = getAvailableSeries();
+        if (!validSeries.includes(formData.series)) setFormData(prev => ({ ...prev, series: validSeries[0] || '', customSeries: '' }));
+    }, [formData.platform, formData.product, formData.releaseType, formData.selectedCustomer]);
     
     useEffect(() => {
         const currentSeries = isCustomSeriesMode ? formData.customSeries : formData.series;
@@ -649,13 +577,68 @@ export const AgentHub: React.FC = () => {
         </div>
     );
 
-    const renderStep1_Manifest = () => {
-        const availablePlatforms = getPlatformsForProduct(formData.product);
-        const availableSeries = getSeriesForPlatform(formData.platform, formData.product);
-        const availableArchs = getArchsForConfig(formData.platform, isCustomSeriesMode ? formData.customSeries : formData.series, isCustomSeriesMode);
-        // ... (Same content as previous Step 1)
+    const renderStep1_Scope = () => {
         return (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+            <div className="flex flex-col h-full max-w-2xl mx-auto space-y-8 py-8 animate-in fade-in slide-in-from-right-4">
+                <div className="text-center mb-4">
+                    <h3 className={`text-xl font-bold ${styles.textMain}`}>Define Release Scope</h3>
+                    <p className={`text-sm ${styles.textSub} mt-2`}>Choose who this package is intended for.</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <label className={`relative p-6 rounded-xl border-2 cursor-pointer transition-all duration-200 flex flex-col items-center text-center gap-4 group ${formData.releaseType === 'Generic' ? 'border-blue-500 bg-blue-500/5' : styles.input + ' hover:bg-white/5 border-transparent'}`}>
+                        <input type="radio" name="releaseType" value="Generic" checked={formData.releaseType === 'Generic'} onChange={() => setFormData({...formData, releaseType: 'Generic', selectedCustomer: ''})} className="hidden" />
+                        <div className={`p-4 rounded-full ${formData.releaseType === 'Generic' ? 'bg-blue-500 text-white' : 'bg-gray-500/20 text-gray-500'}`}>
+                            <Globe size={32}/>
+                        </div>
+                        <div>
+                            <span className={`text-lg font-bold block ${styles.textMain}`}>Generic Release</span>
+                            <span className={`text-xs opacity-60 mt-1 block`}>Standard build available to all customers. Used for general updates and feature rollouts.</span>
+                        </div>
+                        {formData.releaseType === 'Generic' && <div className="absolute top-4 right-4 text-blue-500"><CheckCircle2 size={24}/></div>}
+                    </label>
+
+                    <label className={`relative p-6 rounded-xl border-2 cursor-pointer transition-all duration-200 flex flex-col items-center text-center gap-4 group ${formData.releaseType === 'Customized' ? 'border-amber-500 bg-amber-500/5' : styles.input + ' hover:bg-white/5 border-transparent'}`}>
+                        <input type="radio" name="releaseType" value="Customized" checked={formData.releaseType === 'Customized'} onChange={() => setFormData({...formData, releaseType: 'Customized'})} className="hidden" />
+                        <div className={`p-4 rounded-full ${formData.releaseType === 'Customized' ? 'bg-amber-500 text-white' : 'bg-gray-500/20 text-gray-500'}`}>
+                            <Lock size={32}/>
+                        </div>
+                        <div>
+                            <span className={`text-lg font-bold block ${styles.textMain}`}>Customized Release</span>
+                            <span className={`text-xs opacity-60 mt-1 block`}>Private build specific to a single customer. Contains proprietary configs or features.</span>
+                        </div>
+                        {formData.releaseType === 'Customized' && <div className="absolute top-4 right-4 text-amber-500"><CheckCircle2 size={24}/></div>}
+                    </label>
+                </div>
+
+                {formData.releaseType === 'Customized' && (
+                    <div className="animate-in fade-in slide-in-from-bottom-2 pt-4 border-t border-dashed border-gray-500/30">
+                        <label className={`text-xs font-bold uppercase mb-2 block ${styles.textSub}`}>Select Target Customer</label>
+                        <select 
+                            className={`w-full p-4 rounded-lg border text-lg ${styles.input}`}
+                            value={formData.selectedCustomer}
+                            onChange={(e) => setFormData({...formData, selectedCustomer: e.target.value})}
+                        >
+                            <option value="">-- Select Customer --</option>
+                            {MOCK_CUSTOMERS.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                        <p className="text-xs text-amber-500 mt-2 flex items-center gap-1">
+                            <Info size={14}/> 
+                            <span>This selection will filter available <strong>Series</strong> in the next step.</span>
+                        </p>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    const renderStep2_Manifest = () => {
+        const availablePlatforms = getPlatformsForProduct(formData.product);
+        const availableSeries = getAvailableSeries();
+        const availableArchs = getArchsForConfig(formData.platform, isCustomSeriesMode ? formData.customSeries : formData.series, isCustomSeriesMode);
+        
+        return (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full animate-in fade-in slide-in-from-right-4">
                 <div className="lg:col-span-2 space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2"><label className={`text-xs font-bold uppercase ${styles.textSub}`}>Product</label><select className={`w-full p-3 rounded-lg border ${styles.input}`} value={formData.product} onChange={(e) => setFormData({...formData, product: e.target.value})}>{FILTER_OPTIONS.products.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
@@ -686,7 +669,7 @@ export const AgentHub: React.FC = () => {
         );
     };
 
-    const renderStep2_Compatibility = () => {
+    const renderStep3_Compatibility = () => {
          const fullVersion = `${formData.versionMajor}.${formData.versionMinor}.${formData.versionPatch}`;
          const currentSeries = isCustomSeriesMode ? formData.customSeries : formData.series;
          const availableTargets = MOCK_TARGETS.filter(t => { 
@@ -705,13 +688,38 @@ export const AgentHub: React.FC = () => {
             : 'bg-[#bd93f9]/20 text-[#bd93f9]';
 
          return (
-             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full">
+             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full animate-in fade-in slide-in-from-right-4">
                 <div className="lg:col-span-4 space-y-6">
+                    {/* Target Platform Card - Moved Up */}
+                    <div>
+                        <div className={`text-[10px] font-bold uppercase opacity-50 mb-2`}>TARGET PLATFORM</div>
+                        <div className={`p-4 rounded-lg border flex items-center justify-between ${styles.input}`}>
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-gray-500/10 rounded">{formData.platform === 'Android' ? <Smartphone size={18}/> : <Monitor size={18}/>}</div>
+                                <span className="font-medium">{formData.platform} System</span>
+                            </div>
+                            <div className="p-1 rounded-full bg-green-500 text-white"><Check size={12} strokeWidth={3} /></div>
+                        </div>
+                        <p className="text-[10px] opacity-50 mt-2 leading-relaxed">System targets below are automatically filtered for <strong>{formData.arch}</strong> compatibility based on the manifest.</p>
+                    </div>
+
+                    {/* Manifest Summary */}
                     <div className={`rounded-xl border overflow-hidden ${summaryCardClass}`}>
                         <div className={`px-4 py-3 flex items-center gap-2 font-bold text-xs uppercase tracking-wider ${headerClass}`}>
                             <FileText size={14} /> Manifest Summary
                         </div>
                         <div className="p-5 space-y-4">
+                            {/* Scope Badge */}
+                            <div className="flex justify-center mb-2">
+                                {formData.releaseType === 'Generic' ? (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-500 border border-blue-500/30 uppercase">Generic Release</span>
+                                ) : (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-500 border border-amber-500/30 uppercase flex items-center gap-1">
+                                        <Lock size={10}/> Customized: {formData.selectedCustomer}
+                                    </span>
+                                )}
+                            </div>
+
                             <div className="flex justify-between items-start">
                                 <div><div className={`text-[10px] font-bold uppercase opacity-50 mb-1`}>PRODUCT</div><div className="font-bold text-lg leading-none">{formData.product}</div></div>
                                 <div className="text-right"><div className={`text-[10px] font-bold uppercase opacity-50 mb-1`}>VERSION</div><div className="font-mono font-bold">v{fullVersion}</div></div>
@@ -723,17 +731,6 @@ export const AgentHub: React.FC = () => {
                                 <div><div className={`text-[10px] font-bold uppercase opacity-50 mb-1`}>DEPENDENCIES</div><Badge colorClass={formData.isStandalone ? "bg-green-500/10 text-green-500 border border-green-500/20" : "bg-amber-500/10 text-amber-500 border border-amber-500/20"}>{formData.isStandalone ? 'Standalone' : 'Standard'}</Badge></div>
                             </div>
                         </div>
-                    </div>
-                    <div>
-                        <div className={`text-[10px] font-bold uppercase opacity-50 mb-2`}>TARGET PLATFORM</div>
-                        <div className={`p-4 rounded-lg border flex items-center justify-between ${styles.input}`}>
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-gray-500/10 rounded">{formData.platform === 'Android' ? <Smartphone size={18}/> : <Monitor size={18}/>}</div>
-                                <span className="font-medium">{formData.platform} System</span>
-                            </div>
-                            <div className="p-1 rounded-full bg-green-500 text-white"><Check size={12} strokeWidth={3} /></div>
-                        </div>
-                        <p className="text-[10px] opacity-50 mt-2 leading-relaxed">System targets below are automatically filtered for <strong>{formData.arch}</strong> compatibility based on the manifest.</p>
                     </div>
                 </div>
 
@@ -778,8 +775,8 @@ export const AgentHub: React.FC = () => {
          );
     };
 
-    const renderStep3_Upload = () => (
-        <div className="flex flex-col h-full space-y-6">
+    const renderStep4_Upload = () => (
+        <div className="flex flex-col h-full space-y-6 animate-in fade-in slide-in-from-right-4">
             <div className={`flex-1 border-2 border-dashed rounded-xl flex flex-col items-center justify-center relative ${styles.input} border-opacity-50 transition-colors ${file ? 'bg-blue-500/5 border-blue-500/50' : ''}`}>
                 {!file ? (
                     <div className="text-center p-8 cursor-pointer">
@@ -793,13 +790,33 @@ export const AgentHub: React.FC = () => {
                         <div className="w-16 h-16 bg-green-500/10 text-green-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-in zoom-in"><FileBox size={32} /></div>
                         <h3 className={`text-lg font-bold break-all ${styles.textMain}`}>{file.name}</h3>
                         <div className={`mt-6 space-y-2 text-sm p-4 rounded bg-black/10 text-left font-mono ${styles.textSub}`}>
-                            <div className="flex justify-between"><span>MD5:</span> <span className="text-xs opacity-70">a1b2c3d4e5f67890abcdef1234567890</span></div>
                             <div className="flex justify-between"><span>Size:</span> <span>24.5 MB</span></div>
+                            <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-500/20">
+                                <span>SHA256:</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] opacity-70 bg-black/20 p-1 rounded">
+                                        e3b0c442...855
+                                    </span>
+                                </div>
+                            </div>
                         </div>
                         <button onClick={() => setFile(null)} className="text-red-500 text-sm mt-4 hover:underline">Remove & Choose Another</button>
                     </div>
                 )}
             </div>
+            
+            {/* Help Text for Upload */}
+            <div className="grid grid-cols-2 gap-4 text-xs opacity-60 px-2">
+                <div className="flex gap-2">
+                    <Info size={14} className="shrink-0 mt-0.5" />
+                    <p>Ensure file integrity matches the generated SHA256 checksum before confirming upload.</p>
+                </div>
+                <div className="flex gap-2">
+                    <ShieldAlert size={14} className="shrink-0 mt-0.5" />
+                    <p>Executable files (.exe, .sh) are automatically scanned for malware upon upload.</p>
+                </div>
+            </div>
+
             {/* Description Input Moved Here */}
             <div>
                 <label className={`text-xs font-bold uppercase mb-2 block ${styles.textSub}`}>Description</label>
@@ -814,12 +831,28 @@ export const AgentHub: React.FC = () => {
         </div>
     );
 
-    const renderStep4_Docs = () => (
-        <div className="flex flex-col h-full space-y-6">
+    const renderStep5_Docs = () => (
+        <div className="flex flex-col h-full space-y-6 animate-in fade-in slide-in-from-right-4">
+            {/* Helper Info Box */}
+            <div className={`p-4 rounded-lg border border-blue-500/20 bg-blue-500/5 flex gap-3 text-sm`}>
+                <HelpCircle size={20} className="text-blue-500 shrink-0"/>
+                <div className={styles.textSub}>
+                    <h4 className={`font-bold ${styles.textMain} mb-1`}>Release Note Guidelines</h4>
+                    <p className="text-xs opacity-80 mb-2">
+                        Use <strong className="text-blue-500">Markdown</strong> to format your notes. Clear, structured notes help users understand changes.
+                    </p>
+                    <ul className="list-disc list-inside text-xs opacity-70 space-y-1 ml-1">
+                        <li>Use <code># Header</code> for main sections (e.g., New Features).</li>
+                        <li>Use <code>- List item</code> for bullet points.</li>
+                        <li>Include ticket numbers (e.g., JIRA-123) for reference.</li>
+                    </ul>
+                </div>
+            </div>
+
             <div className="flex-1 flex flex-col">
                 <div className="flex justify-between items-center mb-2">
                     <label className={`text-xs font-bold uppercase ${styles.textSub} flex items-center gap-2`}>
-                        Release Notes <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-400 font-normal">Markdown Supported</span>
+                        Editor <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-400 font-normal">Markdown Supported</span>
                     </label>
                     <div className="flex gap-1">
                         <button onClick={() => setIsPreviewMode(false)} className={`px-3 py-1 text-xs rounded-l border ${!isPreviewMode ? 'bg-blue-500 text-white' : styles.input}`}>Write</button>
@@ -833,6 +866,98 @@ export const AgentHub: React.FC = () => {
             </div>
         </div>
     );
+
+    const renderStep6_Review = () => {
+        const fullVersion = `${formData.versionMajor}.${formData.versionMinor}.${formData.versionPatch}`;
+        const selectedTargetsList = MOCK_TARGETS.filter(t => formData.selectedTargets.includes(t.id));
+
+        return (
+        <div className="animate-in fade-in slide-in-from-right-4 space-y-6 h-full flex flex-col">
+            <div className="text-center mb-4">
+                <h3 className={`text-xl font-bold ${styles.textMain}`}>Review Release Candidate</h3>
+                <p className={`text-sm ${styles.textSub}`}>Please verify all details before submitting to the registry.</p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+                {/* Identity Card */}
+                <div className={`p-5 rounded-xl border relative overflow-hidden ${styles.input}`}>
+                    <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+                    <h4 className="text-xs font-bold uppercase opacity-50 mb-4 tracking-wider flex items-center gap-2">
+                        <Package size={14}/> Package Identity
+                    </h4>
+                    <div className="grid grid-cols-2 gap-y-4 gap-x-8 text-sm">
+                        <div>
+                            <div className="text-[10px] uppercase opacity-50 mb-1">Product & Platform</div>
+                            <div className={`font-bold ${styles.textMain}`}>{formData.product} on {formData.platform}</div>
+                        </div>
+                        <div>
+                            <div className="text-[10px] uppercase opacity-50 mb-1">Version</div>
+                            <div className="font-mono font-bold text-base">{fullVersion}</div>
+                        </div>
+                        <div>
+                            <div className="text-[10px] uppercase opacity-50 mb-1">Scope</div>
+                            {formData.releaseType === 'Generic' ? (
+                                <span className="inline-flex items-center gap-1.5 text-blue-500 font-bold text-xs"><Globe size={12}/> Generic Release</span>
+                            ) : (
+                                <span className="inline-flex items-center gap-1.5 text-amber-500 font-bold text-xs"><Lock size={12}/> {formData.selectedCustomer}</span>
+                            )}
+                        </div>
+                        <div>
+                            <div className="text-[10px] uppercase opacity-50 mb-1">Series & Arch</div>
+                            <div className={styles.textMain}>{formData.series} <span className="opacity-50 mx-1">/</span> {formData.arch}</div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* File & Targets Split */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className={`p-4 rounded-xl border ${styles.input}`}>
+                        <h4 className="text-xs font-bold uppercase opacity-50 mb-3 tracking-wider flex items-center gap-2"><FileBox size={14}/> File Artifact</h4>
+                        <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                                <span className="opacity-70">Filename:</span>
+                                <span className={`font-mono font-bold truncate max-w-[120px] ${styles.textMain}`} title={file?.name}>{file?.name || 'No file selected'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="opacity-70">Size:</span>
+                                <span className="font-mono">24.5 MB</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="opacity-70">SHA256:</span>
+                                <span className="font-mono text-[10px] opacity-50 bg-black/20 px-1 rounded">e3b0...855</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className={`p-4 rounded-xl border flex flex-col ${styles.input} max-h-48`}>
+                        <div className="flex justify-between items-center mb-3">
+                            <h4 className="text-xs font-bold uppercase opacity-50 tracking-wider flex items-center gap-2"><Layers size={14}/> Targets</h4>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-500 font-bold">{formData.selectedTargets.length}</span>
+                        </div>
+                        <div className="flex-1 overflow-y-auto pr-1 space-y-1 custom-scrollbar">
+                            {selectedTargetsList.length > 0 ? selectedTargetsList.map(t => (
+                                <div key={t.id} className="flex items-center justify-between text-xs p-1.5 rounded hover:bg-white/5 border border-transparent hover:border-white/10">
+                                    <span className="font-medium truncate max-w-[120px]" title={t.name}>{t.name}</span>
+                                    <span className="opacity-50 font-mono text-[10px]">{t.osVer}</span>
+                                </div>
+                            )) : (
+                                <div className="text-center opacity-50 text-xs italic py-4">No targets selected</div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Notes Preview */}
+                <div className={`p-4 rounded-xl border ${styles.input}`}>
+                    <h4 className="text-xs font-bold uppercase opacity-50 mb-3 tracking-wider flex items-center gap-2"><FileText size={14}/> Release Notes Preview</h4>
+                    <div className="text-xs font-mono opacity-70 bg-black/20 p-3 rounded max-h-32 overflow-y-auto whitespace-pre-wrap">
+                        {formData.releaseNotes}
+                    </div>
+                </div>
+            </div>
+        </div>
+        );
+    };
 
     // ... (renderSuccess & Modal Wrapper existing code)
     const renderSuccess = () => (
@@ -870,10 +995,12 @@ export const AgentHub: React.FC = () => {
                 <div className="p-8 overflow-y-auto flex-1 bg-opacity-50 relative">
                     {isSuccess ? renderSuccess() : (
                         <>
-                            {step === 1 && renderStep1_Manifest()}
-                            {step === 2 && renderStep2_Compatibility()}
-                            {step === 3 && renderStep3_Upload()}
-                            {step === 4 && renderStep4_Docs()}
+                            {step === 1 && renderStep1_Scope()}
+                            {step === 2 && renderStep2_Manifest()}
+                            {step === 3 && renderStep3_Compatibility()}
+                            {step === 4 && renderStep4_Upload()}
+                            {step === 5 && renderStep5_Docs()}
+                            {step === 6 && renderStep6_Review()}
                         </>
                     )}
                 </div>
@@ -883,11 +1010,11 @@ export const AgentHub: React.FC = () => {
                         <div className="flex gap-3">
                             {step > 1 && <button onClick={() => setStep(step - 1)} className={`px-6 py-2 rounded-lg border ${styles.textMain}`}>Back</button>}
                             <button 
-                                onClick={() => { if(step < 4) { if(step === 3 && !file) return; setStep(step + 1); } else { setIsSuccess(true); } }} 
-                                disabled={(step === 3 && !file) || (step === 1 && isDuplicateVersion)} 
-                                className={`px-8 py-2 rounded-lg font-medium shadow-lg flex items-center gap-2 ${(step === 3 && !file) || (step === 1 && isDuplicateVersion) ? 'opacity-50 cursor-not-allowed bg-gray-500' : styles.buttonPrimary}`}
+                                onClick={() => { if(step < 6) { if(step === 4 && !file) return; setStep(step + 1); } else { setIsSuccess(true); } }} 
+                                disabled={(step === 4 && !file) || (step === 2 && isDuplicateVersion) || (step === 1 && formData.releaseType === 'Customized' && !formData.selectedCustomer)} 
+                                className={`px-8 py-2 rounded-lg font-medium shadow-lg flex items-center gap-2 ${(step === 4 && !file) || (step === 2 && isDuplicateVersion) || (step === 1 && formData.releaseType === 'Customized' && !formData.selectedCustomer) ? 'opacity-50 cursor-not-allowed bg-gray-500' : styles.buttonPrimary}`}
                             >
-                                {step === 4 ? 'Confirm Upload' : 'Next'} <ArrowRight size={16}/>
+                                {step === 6 ? 'Confirm Upload' : 'Next'} <ArrowRight size={16}/>
                             </button>
                         </div>
                     </div>
@@ -897,7 +1024,7 @@ export const AgentHub: React.FC = () => {
     );
   };
 
-  // --- RELEASE WIZARD MODAL COMPONENT ---
+  // --- RELEASE WIZARD MODAL COMPONENT (unchanged) ---
   const ReleaseModal = () => {
       const [step, setStep] = useState(1);
       const [status, setStatus] = useState<'idle' | 'loading' | 'success'>('idle');
@@ -1119,50 +1246,52 @@ export const AgentHub: React.FC = () => {
                     ) : (
                         <div className="animate-in fade-in slide-in-from-right-4 space-y-6">
                             {/* Detailed File Info */}
-                            <div className={`p-4 rounded-lg border bg-opacity-50 ${styles.input} flex flex-col gap-4`}>
-                                <div className="flex items-center gap-2 text-xs font-bold uppercase opacity-50 tracking-wider">
-                                    <FileBadge size={14} /> File Identity & Manifest
-                                </div>
-                                <div className="grid grid-cols-2 gap-y-4 gap-x-8 text-sm">
-                                    <div className="col-span-2 pb-2 border-b border-gray-500/10 mb-2">
-                                        <div className="text-xs opacity-50 uppercase mb-1">Filename</div>
-                                        <div className={`font-mono font-bold truncate text-base ${styles.textMain}`}>{selectedPackage.filename}</div>
+                            <div className={`p-4 rounded-lg border bg-opacity-50 ${styles.input} flex flex-col gap-3`}>
+                                <div className="flex items-center gap-3 border-b border-gray-500/10 pb-3">
+                                    <div className={`p-2 rounded bg-blue-500/10 text-blue-500 shrink-0`}>
+                                        <FileBadge size={20} />
                                     </div>
-                                    
+                                    <div className="min-w-0">
+                                        <div className="text-[10px] font-bold uppercase opacity-50 tracking-wider">File Manifest</div>
+                                        <div className={`font-mono font-bold truncate text-sm ${styles.textMain}`} title={selectedPackage.filename}>{selectedPackage.filename}</div>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-3 gap-y-3 gap-x-4 text-xs">
                                     <div>
-                                        <div className="text-xs opacity-50 uppercase mb-1">Product</div>
+                                        <div className="opacity-50 uppercase text-[10px] mb-0.5">Product</div>
                                         <div className={`font-medium ${styles.textMain}`}>{selectedPackage.product}</div>
                                     </div>
                                     <div>
-                                        <div className="text-xs opacity-50 uppercase mb-1">Platform</div>
-                                        <div className={`font-medium ${styles.textMain}`}>{selectedPackage.platform}</div>
-                                    </div>
-                                    
-                                    <div>
-                                        <div className="text-xs opacity-50 uppercase mb-1">Series</div>
-                                        <div className={`font-medium ${styles.textMain}`}>{selectedPackage.series}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-xs opacity-50 uppercase mb-1">Architecture</div>
-                                        <Badge colorClass="bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">{selectedPackage.arch.join(', ')}</Badge>
-                                    </div>
-
-                                    <div>
-                                        <div className="text-xs opacity-50 uppercase mb-1">Version</div>
+                                        <div className="opacity-50 uppercase text-[10px] mb-0.5">Version</div>
                                         <div className={`font-mono font-bold ${styles.textMain}`}>v{selectedPackage.version}</div>
                                     </div>
                                     <div>
-                                        <div className="text-xs opacity-50 uppercase mb-1">Size</div>
+                                        <div className="opacity-50 uppercase text-[10px] mb-0.5">Size</div>
                                         <div className={`font-mono ${styles.textMain}`}>{selectedPackage.size}</div>
                                     </div>
-
+                                    
                                     <div>
-                                        <div className="text-xs opacity-50 uppercase mb-1">Uploaded</div>
-                                        <div className="opacity-70">{selectedPackage.uploadedAt}</div>
+                                        <div className="opacity-50 uppercase text-[10px] mb-0.5">Platform</div>
+                                        <div className={`font-medium ${styles.textMain}`}>{selectedPackage.platform}</div>
                                     </div>
                                     <div>
-                                        <div className="text-xs opacity-50 uppercase mb-1">SHA Checksum</div>
-                                        <div className="font-mono text-xs opacity-70 truncate" title="SHA256: 8829a...">8829a...f9921</div>
+                                        <div className="opacity-50 uppercase text-[10px] mb-0.5">Series</div>
+                                        <div className={`font-medium ${styles.textMain}`}>{selectedPackage.series}</div>
+                                    </div>
+                                    <div>
+                                        <div className="opacity-50 uppercase text-[10px] mb-0.5">Arch</div>
+                                        <div className={`font-medium ${styles.textMain}`}>{selectedPackage.arch.join(', ')}</div>
+                                    </div>
+
+                                    <div className="col-span-3 pt-2 border-t border-gray-500/10 flex justify-between items-center">
+                                        <div>
+                                            <div className="opacity-50 uppercase text-[10px]">Uploaded</div>
+                                            <div className="opacity-80">{selectedPackage.uploadedAt}</div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="opacity-50 uppercase text-[10px]">SHA Checksum</div>
+                                            <div className="font-mono text-[10px] opacity-60 truncate max-w-[150px]">8829a...f9921</div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1323,12 +1452,15 @@ export const AgentHub: React.FC = () => {
               <table className="w-full text-left text-sm border-collapse">
                   <thead>
                       <tr className={styles.header}>
-                          <th className="p-4 font-semibold w-12">Product</th>
+                          <th className="p-4 font-semibold w-12 text-center">Product</th>
                           <th className="p-4 font-semibold">Platform</th>
+                          <th className="p-4 font-semibold">Arch</th>
                           <th className="p-4 font-semibold">Series</th>
                           <th className="p-4 font-semibold">Support OS</th>
                           <th className="p-4 font-semibold">Version Info</th>
-                          <th className="p-4 font-semibold">Release Status & Channels</th>
+                          <th className="p-4 font-semibold">Dependencies</th>
+                          <th className="p-4 font-semibold">Status</th>
+                          <th className="p-4 font-semibold">Channels</th>
                           <th className="p-4 font-semibold text-right">Actions</th>
                       </tr>
                   </thead>
@@ -1344,48 +1476,50 @@ export const AgentHub: React.FC = () => {
                              onClick={() => { setSelectedPackage(item); setIsDetailOpen(true); }}
                           >
                               {/* Product */}
-                              <td className="p-4 align-top">
-                                  <div className="flex flex-col items-center gap-1 w-16">
-                                      {item.product === 'Agent' && <div className="p-2 rounded bg-blue-500/20 text-blue-500"><Monitor size={20}/></div>}
-                                      {item.product === 'OTA Img' && <div className="p-2 rounded bg-purple-500/20 text-purple-500"><Layers size={20}/></div>}
-                                      {item.product === 'Tool' && <div className="p-2 rounded bg-orange-500/20 text-orange-500"><Wrench size={20}/></div>}
-                                      {item.product === 'Library' && <div className="p-2 rounded bg-green-500/20 text-green-500"><FileBox size={20}/></div>}
-                                      <span className="text-xs font-bold text-center">{item.product}</span>
+                              <td className="p-4 align-top text-center">
+                                  <div className="flex flex-col items-center gap-1 w-12 mx-auto">
+                                      {item.product === 'Agent' && <div className="p-2 rounded bg-blue-500/20 text-blue-500"><Monitor size={18}/></div>}
+                                      {item.product === 'OTA Img' && <div className="p-2 rounded bg-purple-500/20 text-purple-500"><Layers size={18}/></div>}
+                                      {item.product === 'Tool' && <div className="p-2 rounded bg-orange-500/20 text-orange-500"><Wrench size={18}/></div>}
+                                      {item.product === 'Library' && <div className="p-2 rounded bg-green-500/20 text-green-500"><FileBox size={18}/></div>}
+                                      <span className="text-[10px] font-bold uppercase">{item.product}</span>
                                   </div>
                               </td>
 
                               {/* Platform */}
                               <td className="p-4 align-top">
                                   <div className="flex items-center gap-2">
-                                          {item.platform === 'Android' && <Smartphone size={18} className="text-green-500"/>}
-                                          {item.platform === 'Windows' && <Monitor size={18} className="text-blue-500"/>}
-                                          {item.platform === 'Linux' && <Terminal size={18} className="text-orange-500"/>}
-                                          <span className="font-medium">{item.platform}</span>
+                                          {item.platform === 'Android' && <Smartphone size={16} className="text-green-500"/>}
+                                          {item.platform === 'Windows' && <Monitor size={16} className="text-blue-500"/>}
+                                          {item.platform === 'Linux' && <Terminal size={16} className="text-orange-500"/>}
+                                          <span className="font-medium text-sm">{item.platform}</span>
                                   </div>
                               </td>
 
-                              {/* Series & Arch */}
+                              {/* Architecture */}
                               <td className="p-4 align-top">
-                                  <div className="flex flex-col gap-1">
-                                      <div className={`text-xs px-2 py-0.5 rounded-md inline-block w-fit bg-opacity-20 bg-gray-500`}>
-                                          {item.series}
-                                      </div>
-                                      <div className="flex flex-wrap gap-1 mt-1 max-w-[120px]">
-                                          {item.arch.map(a => (
-                                              <Badge key={a} colorClass="bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">{a}</Badge>
-                                          ))}
-                                      </div>
+                                  <div className="flex flex-wrap gap-1 max-w-[100px]">
+                                      {item.arch.map(a => (
+                                          <Badge key={a} colorClass="bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">{a}</Badge>
+                                      ))}
+                                  </div>
+                              </td>
+
+                              {/* Series */}
+                              <td className="p-4 align-top">
+                                  <div className={`text-xs px-2 py-0.5 rounded-md inline-block bg-opacity-20 bg-gray-500 whitespace-nowrap`}>
+                                      {item.series}
                                   </div>
                               </td>
 
                               {/* Support OS (Cleaned) */}
                               <td className="p-4 align-top">
-                                  <div className="flex flex-wrap gap-1 items-center max-w-[200px]">
-                                      {item.supportOS.slice(0, 3).map((os, i) => (
+                                  <div className="flex flex-wrap gap-1 items-center max-w-[150px]">
+                                      {item.supportOS.slice(0, 2).map((os, i) => (
                                           <Badge key={i}>{os}</Badge>
                                       ))}
-                                      {item.supportOS.length > 3 && (
-                                          <span className="text-[10px] opacity-50 px-1">+{item.supportOS.length - 3}</span>
+                                      {item.supportOS.length > 2 && (
+                                          <span className="text-[10px] opacity-50 px-1">+{item.supportOS.length - 2}</span>
                                       )}
                                   </div>
                               </td>
@@ -1393,46 +1527,54 @@ export const AgentHub: React.FC = () => {
                               {/* Version Info */}
                               <td className="p-4 align-top">
                                   <div className="flex flex-col">
-                                      <span className="font-mono text-base font-bold">{item.version}</span>
-                                      <span className={`text-xs ${styles.textSub} truncate max-w-[150px]`} title={item.filename}>{item.filename}</span>
-                                      <span className={`text-xs opacity-60`}>{item.size} • {item.uploadedAt}</span>
+                                      <span className="font-mono text-sm font-bold">{item.version}</span>
+                                      <span className={`text-[10px] ${styles.textSub} truncate max-w-[120px]`} title={item.filename}>{item.filename}</span>
+                                      <span className={`text-[10px] opacity-60`}>{item.size} • {item.uploadedAt}</span>
                                   </div>
                               </td>
 
-                              {/* Release Status & Channels */}
+                              {/* Dependencies */}
                               <td className="p-4 align-top">
-                                  <div className="flex flex-col gap-2">
-                                      {/* Status Badge */}
-                                      {isDeprecated ? (
-                                          <div className="flex items-center gap-1.5 text-xs font-bold text-red-500 bg-red-500/10 px-2 py-1 rounded w-fit border border-red-500/20">
-                                              <Ban size={12} /> DEPRECATED
-                                          </div>
-                                      ) : isReleased ? (
-                                          <div className="flex items-center gap-1.5 text-xs font-bold text-green-500 bg-green-500/10 px-2 py-1 rounded w-fit border border-green-500/20">
-                                              <Rocket size={12} /> RELEASED
-                                          </div>
-                                      ) : (
-                                          <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500 bg-gray-500/10 px-2 py-1 rounded w-fit border border-gray-500/20">
-                                              <Clock size={12} /> NOT RELEASED
-                                          </div>
-                                      )}
+                                  {item.dependencies.isStandalone ? (
+                                      <span className="text-[10px] px-2 py-0.5 rounded border border-green-500/30 bg-green-500/10 text-green-500">Standalone</span>
+                                  ) : (
+                                      <div className="flex flex-col text-xs">
+                                          <span className="opacity-60 text-[10px] uppercase">Requires:</span>
+                                          <span className="font-mono">Agent v{item.dependencies.major}.{item.dependencies.minor}</span>
+                                      </div>
+                                  )}
+                              </td>
 
-                                      {!isDeprecated && isReleased && (
-                                          <div className="flex flex-wrap gap-1">
-                                              {item.channels.length > 0 ? item.channels.map(c => (
-                                                  <Badge key={c} colorClass="bg-blue-500/20 text-blue-400 border border-blue-500/30">{c}</Badge>
-                                              )) : (
-                                                  <span className="text-[10px] opacity-50 italic">No Active Channels</span>
-                                              )}
-                                          </div>
-                                      )}
-                                      {!isDeprecated && isReleased && (
-                                          <div className="flex gap-2 text-xs opacity-60 mt-0.5">
-                                              {item.targets.includes('Spotlight Download Page') && <Globe size={14} title="Spotlight" />}
-                                              {item.targets.includes('Automation Update Service') && <Zap size={14} title="Automation" />}
-                                          </div>
-                                      )}
-                                  </div>
+                              {/* Release Status */}
+                              <td className="p-4 align-top">
+                                  {isDeprecated ? (
+                                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-red-500 bg-red-500/10 px-2 py-1 rounded w-fit border border-red-500/20">
+                                          <Ban size={10} /> DEPRECATED
+                                      </div>
+                                  ) : isReleased ? (
+                                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-green-500 bg-green-500/10 px-2 py-1 rounded w-fit border border-green-500/20">
+                                          <Rocket size={10} /> RELEASED
+                                      </div>
+                                  ) : (
+                                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500 bg-gray-500/10 px-2 py-1 rounded w-fit border border-gray-500/20">
+                                          <Clock size={10} /> NOT RELEASED
+                                      </div>
+                                  )}
+                              </td>
+
+                              {/* Channels */}
+                              <td className="p-4 align-top">
+                                  {!isDeprecated && isReleased ? (
+                                      <div className="flex flex-wrap gap-1 max-w-[120px]">
+                                          {item.channels.length > 0 ? item.channels.map(c => (
+                                              <Badge key={c} colorClass="bg-blue-500/20 text-blue-400 border border-blue-500/30">{c}</Badge>
+                                          )) : (
+                                              <span className="text-[10px] opacity-50 italic">No Active Channels</span>
+                                          )}
+                                      </div>
+                                  ) : (
+                                      <span className="text-[10px] opacity-30">-</span>
+                                  )}
                               </td>
 
                               {/* Actions */}
@@ -1443,9 +1585,9 @@ export const AgentHub: React.FC = () => {
                                             title={isReleased ? "Manage Release" : "Release Now"}
                                             onClick={(e) => { e.stopPropagation(); setSelectedPackage(item); setIsReleaseOpen(true); }}
                                             disabled={item.status === 'deprecated'}
-                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold uppercase transition-all ${item.status === 'deprecated' ? 'bg-gray-500 opacity-50 cursor-not-allowed' : (theme === AppTheme.LIGHT ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-500/20')}`}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all ${item.status === 'deprecated' ? 'bg-gray-500 opacity-50 cursor-not-allowed' : (theme === AppTheme.LIGHT ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-500/20')}`}
                                           >
-                                              <Rocket size={14} /> {isReleased ? 'Manage' : 'Release'}
+                                              <Rocket size={12} /> {isReleased ? 'Manage' : 'Release'}
                                           </button>
                                       </div>
                                       <div className="flex gap-1 mt-1">
@@ -1454,17 +1596,17 @@ export const AgentHub: React.FC = () => {
                                             className={`p-1.5 rounded hover:bg-blue-500/20 text-blue-500 transition-colors`}
                                             title="Edit File Details"
                                           >
-                                              <Edit3 size={16} />
+                                              <Edit3 size={14} />
                                           </button>
                                           <button onClick={(e) => e.stopPropagation()} className={`p-1.5 rounded hover:bg-gray-500/20 text-gray-400 transition-colors`}>
-                                              <Download size={16} />
+                                              <Download size={14} />
                                           </button>
                                           <button 
                                             onClick={(e) => { e.stopPropagation(); setSelectedPackage(item); setIsStatusOpen(true); }}
                                             className={`p-1.5 rounded hover:bg-red-500/20 text-red-500 transition-colors`}
                                             title="Manage Status / Delete"
                                           >
-                                              <Trash2 size={16} />
+                                              <Trash2 size={14} />
                                           </button>
                                       </div>
                                   </div>
