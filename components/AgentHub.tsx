@@ -83,7 +83,7 @@ interface ReleasePackage {
   size: string;
   uploadedAt: string;
   uploader: string;
-  status: 'active' | 'deprecated'; // explicit status
+  status: 'active' | 'decommissioned'; // explicit status
   channels: ReleaseChannel[]; // New: Active channels
   targets: ReleaseTarget[];   // New: Where it is released
   scope?: 'Generic' | 'Customized';
@@ -128,7 +128,7 @@ const MOCK_RELEASES: ReleasePackage[] = [
   { 
     id: '3', product: 'Tool', platform: 'Linux', series: 'Universal', arch: ['x86_64'], 
     supportOS: ['Ubuntu 22.04', 'Debian 11'], version: '1.0.5', filename: 'log-collector-linux.sh', 
-    size: '15 KB', uploadedAt: '2025-09-05', uploader: 'support@corp.com', status: 'deprecated',
+    size: '15 KB', uploadedAt: '2025-09-05', uploader: 'support@corp.com', status: 'decommissioned',
     channels: [], targets: [],
     scope: 'Generic', customers: [],
     description: 'Debug script for log retrieval.',
@@ -136,7 +136,7 @@ const MOCK_RELEASES: ReleasePackage[] = [
     dependencies: { major: '', minor: '', patch: '', isStandalone: true },
     activityLog: [
         { id: 'a1', user: 'support@corp.com', action: 'Uploaded package', timestamp: '2025-09-05 11:20' },
-        { id: 'a2', user: 'admin@corp.com', action: 'Marked as Deprecated', timestamp: '2025-10-01 10:00' }
+        { id: 'a2', user: 'admin@corp.com', action: 'Marked as Decommissioned', timestamp: '2025-10-01 10:00' }
     ]
   },
   { 
@@ -408,14 +408,14 @@ export const AgentHub: React.FC = () => {
   // ... (StatusManagementModal and DetailEditModal kept as is) ...
   const StatusManagementModal = () => {
     if (!selectedPackage) return null;
-    const [confirmAction, setConfirmAction] = useState<'revert' | 'deprecate' | null>(null);
+    const [confirmAction, setConfirmAction] = useState<'revert' | 'decommission' | null>(null);
 
     const executeAction = () => {
         if (!confirmAction) return;
         const idx = MOCK_RELEASES.findIndex(r => r.id === selectedPackage.id);
         if (idx !== -1) {
-            if (confirmAction === 'deprecate') {
-                MOCK_RELEASES[idx].status = 'deprecated';
+            if (confirmAction === 'decommission') {
+                MOCK_RELEASES[idx].status = 'decommissioned';
             } else if (confirmAction === 'revert') {
                 MOCK_RELEASES[idx].status = 'active';
                 MOCK_RELEASES[idx].channels = [];
@@ -430,7 +430,7 @@ export const AgentHub: React.FC = () => {
     const getConfirmConfig = () => {
         switch(confirmAction) {
             case 'revert': return { icon: RotateCcw, color: 'text-gray-400', title: 'Revert to Not Released', desc: 'This will remove the package from all channels and targets. It will no longer be available for download.' };
-            case 'deprecate': return { icon: Ban, color: 'text-amber-500', title: 'Deprecate File', desc: 'This will mark the release as obsolete. Existing users may still have it, but new downloads will be discouraged.' };
+            case 'decommission': return { icon: Ban, color: 'text-amber-500', title: 'Decommission File', desc: 'This will mark the release as decommissioned. Existing users may still have it, but new downloads will be discouraged.' };
             default: return { icon: Info, color: 'text-white', title: '', desc: '' };
         }
     }
@@ -449,18 +449,18 @@ export const AgentHub: React.FC = () => {
                              <p className={`text-sm ${styles.textSub} mt-2`}>{config.desc}</p>
                              
                              {/* Warning if actively released */}
-                             {confirmAction === 'deprecate' && selectedPackage.targets.length > 0 && (
+                             {confirmAction === 'decommission' && selectedPackage.targets.length > 0 && (
                                 <div className="bg-amber-500/10 border border-amber-500/20 rounded p-3 text-xs text-amber-500 mt-2 flex items-start gap-2 text-left">
                                     <AlertTriangle size={16} className="shrink-0 mt-0.5"/>
                                     <div>
-                                        <strong>Warning:</strong> This file is currently live on <strong>{selectedPackage.targets.length} targets</strong>. Deprecating it may affect active deployments.
+                                        <strong>Warning:</strong> This file is currently live on <strong>{selectedPackage.targets.length} targets</strong>. Decommissioning it may affect active deployments.
                                     </div>
                                 </div>
                              )}
                          </div>
                          <div className="flex gap-3 mt-4">
                              <button onClick={() => setConfirmAction(null)} className={`flex-1 py-3 rounded-lg font-medium border border-inherit ${styles.textSub} hover:bg-white/5`}>Cancel</button>
-                             <button onClick={executeAction} className={`flex-1 py-3 rounded-lg font-bold text-white shadow-lg ${confirmAction === 'deprecate' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-gray-600 hover:bg-gray-500'}`}>
+                             <button onClick={executeAction} className={`flex-1 py-3 rounded-lg font-bold text-white shadow-lg ${confirmAction === 'decommission' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-gray-600 hover:bg-gray-500'}`}>
                                  Yes, {config.title.split(' ')[0]}
                              </button>
                          </div>
@@ -483,9 +483,9 @@ export const AgentHub: React.FC = () => {
                                 <div className="p-2 bg-gray-500/20 text-gray-400 rounded-full"><RotateCcw size={18}/></div>
                                 <div><div className={`font-bold ${styles.textMain}`}>Revert to "Not Released"</div><div className={`text-xs ${styles.textSub}`}>Clear all channels and targets. Files remain in storage.</div></div>
                             </button>
-                            <button onClick={() => setConfirmAction('deprecate')} className={`w-full p-4 rounded-lg border text-left flex items-center gap-3 transition-colors ${selectedPackage.status === 'deprecated' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-amber-500/10 border-amber-500/30'}`} disabled={selectedPackage.status === 'deprecated'}>
+                            <button onClick={() => setConfirmAction('decommission')} className={`w-full p-4 rounded-lg border text-left flex items-center gap-3 transition-colors ${selectedPackage.status === 'decommissioned' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-amber-500/10 border-amber-500/30'}`} disabled={selectedPackage.status === 'decommissioned'}>
                                 <div className="p-2 bg-amber-500/20 text-amber-500 rounded-full"><Ban size={18}/></div>
-                                <div><div className={`font-bold ${styles.textMain}`}>Deprecate File</div><div className={`text-xs ${styles.textSub}`}>Mark as obsolete. Prevents new downloads but keeps history.</div></div>
+                                <div><div className={`font-bold ${styles.textMain}`}>Decommission File</div><div className={`text-xs ${styles.textSub}`}>Mark as decommissioned. Prevents new downloads but keeps history.</div></div>
                             </button>
                         </div>
                         <div className="flex justify-end">
@@ -573,27 +573,33 @@ export const AgentHub: React.FC = () => {
 
     return (
       <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${styles.modalOverlay}`}>
-          <div className={`w-full max-w-4xl rounded-xl shadow-2xl border flex flex-col h-[85vh] ${styles.modalBg}`}>
-              <div className="p-6 border-b border-inherit flex justify-between items-center">
-                  <div className="flex items-center gap-4">
-                      <div className={`p-3 rounded-lg ${theme === AppTheme.LIGHT ? 'bg-blue-100 text-blue-600' : 'bg-blue-500/20 text-blue-400'}`}><Package size={28} /></div>
+          <div className={`w-full max-w-4xl rounded-xl shadow-2xl border flex flex-col h-[80vh] ${styles.modalBg}`}>
+              <div className="p-6 border-b border-inherit flex justify-between items-start">
+                  <div className="flex items-start gap-4">
+                      <div className={`p-3 rounded-lg ${theme === AppTheme.LIGHT ? 'bg-blue-100 text-blue-600' : 'bg-blue-500/20 text-blue-400'}`}><Package size={24} /></div>
                       <div>
-                          <div className="flex items-center gap-3">
-                              <h2 className={`text-2xl font-bold ${styles.textMain}`}>Application Detail</h2>
-                              {editForm.status === 'deprecated' ? (
-                                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-500 border border-red-500/20">Deprecated</span>
+                          <div className="text-xs font-bold uppercase opacity-50 mb-1">Application Detail</div>
+                          <h2 className={`text-xl font-bold ${styles.textMain} flex items-center gap-2`}>
+                              {editForm.filename}
+                              {editForm.status === 'decommissioned' ? (
+                                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-500 border border-red-500/20">Decommissioned</span>
                               ) : editForm.targets.length > 0 ? (
                                   <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 border border-green-500/20">Released</span>
                               ) : (
                                   <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-gray-500/20 text-gray-500 border border-gray-500/20">Not Released</span>
                               )}
+                          </h2>
+                          <div className={`flex items-center gap-4 text-xs mt-1 ${styles.textSub}`}>
+                              <span className="flex items-center gap-1"><Monitor size={12}/> {editForm.product} • {editForm.platform} • {editForm.series}</span>
+                              <span className="flex items-center gap-1"><Cpu size={12}/> {editForm.arch.join(', ')}</span>
+                              <span className="flex items-center gap-1"><Clock size={12}/> {editForm.uploadedAt}</span>
                           </div>
                       </div>
                   </div>
                   <div className="flex items-center gap-2">
                       {!isEditing ? (
-                          selectedPackage.status !== 'deprecated' && (
-                            <button onClick={() => setIsEditing(true)} className={`px-4 py-2 text-sm rounded-md border flex items-center gap-2 hover:bg-opacity-10 hover:bg-blue-500 transition-colors ${styles.textMain} border-inherit`}><Edit3 size={14} /> Edit Details</button>
+                          selectedPackage.status !== 'decommissioned' && (
+                            <button onClick={() => setIsEditing(true)} className={`px-3 py-1.5 text-sm rounded-md border flex items-center gap-2 hover:bg-opacity-10 hover:bg-blue-500 transition-colors ${styles.textMain} border-inherit`}><Edit3 size={14} /> Edit Details</button>
                           )
                       ) : <div className="flex gap-2"><button onClick={() => { setIsEditing(false); setEditForm(selectedPackage); }} className="px-3 py-1.5 text-sm rounded-md border border-red-500/30 text-red-500 hover:bg-red-500/10">Cancel</button><button onClick={handleSave} className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-2 ${styles.buttonPrimary}`}><Save size={14} /> Save Changes</button></div>}
                       <button onClick={() => setIsDetailOpen(false)} className={`p-2 hover:text-red-500 transition-colors ${styles.textSub}`}><X size={20} /></button>
@@ -602,87 +608,7 @@ export const AgentHub: React.FC = () => {
               <div className={`flex px-6 border-b border-inherit gap-6 ${styles.textSub}`}><button onClick={() => setActiveTab('general')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'general' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>MANIFEST & Docs</button><button onClick={() => setActiveTab('compat')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'compat' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>Compatibility</button><button onClick={() => setActiveTab('activity')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'activity' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>File Activity</button></div>
               <div className="flex-1 overflow-y-auto p-6 bg-opacity-50">
                   {activeTab === 'general' && <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-                      
-                      {/* Section 1: Package Identity */}
-                      <div className={`p-5 rounded-lg border ${styles.input} bg-opacity-30`}>
-                          <h4 className={`text-xs font-bold uppercase mb-4 tracking-wider flex items-center gap-2 ${styles.textSub}`}>
-                              <Fingerprint size={14}/> Package Identity
-                          </h4>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-y-4 gap-x-8 text-sm">
-                              <div>
-                                  <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Product</div>
-                                  <div className={`font-bold flex items-center gap-2 ${styles.textMain}`}>
-                                      {editForm.product === 'Agent' && <Monitor size={16} className="text-blue-500"/>}
-                                      {editForm.product === 'OTA Img' && <Layers size={16} className="text-purple-500"/>}
-                                      {editForm.product === 'Tool' && <Wrench size={16} className="text-orange-500"/>}
-                                      {editForm.product}
-                                  </div>
-                              </div>
-                              <div>
-                                  <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Platform</div>
-                                  <div className={`font-medium ${styles.textMain}`}>{editForm.platform}</div>
-                              </div>
-                              <div>
-                                  <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Series</div>
-                                  <div className={`font-medium ${styles.textMain}`}>{editForm.series}</div>
-                              </div>
-                              <div>
-                                  <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Architecture</div>
-                                  <div className={`font-mono text-xs px-2 py-1 rounded bg-black/20 w-fit ${styles.textMain}`}>{editForm.arch.join(', ')}</div>
-                              </div>
-                              
-                              <div className="col-span-2 md:col-span-4 pt-3 mt-1 border-t border-gray-500/20">
-                                  <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Release Scope</div>
-                                  {editForm.scope === 'Generic' ? (
-                                      <div className="flex items-center gap-2 text-blue-500 font-medium">
-                                          <Globe size={16} /> 
-                                          <span>Generic Release</span>
-                                          <span className="text-xs opacity-60 font-normal ml-2">(Available to all customers)</span>
-                                      </div>
-                                  ) : (
-                                      <div className="flex items-center gap-2 text-amber-500 font-medium">
-                                          <Lock size={16} /> 
-                                          <span>Customized: {editForm.customers?.join(', ')}</span>
-                                      </div>
-                                  )}
-                              </div>
-                          </div>
-                      </div>
-
-                      {/* Section 2: File Artifact */}
-                      <div className={`p-5 rounded-lg border ${styles.input} bg-opacity-30`}>
-                          <h4 className={`text-xs font-bold uppercase mb-4 tracking-wider flex items-center gap-2 ${styles.textSub}`}>
-                              <FileBox size={14}/> File Artifact
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <div className="space-y-4">
-                                  <div>
-                                      <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Filename</div>
-                                      <div className={`font-mono font-bold text-base truncate ${styles.textMain}`} title={editForm.filename}>{editForm.filename}</div>
-                                  </div>
-                                  <div className="flex gap-8">
-                                      <div>
-                                          <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Size</div>
-                                          <div className={`font-mono ${styles.textMain}`}>{editForm.size}</div>
-                                      </div>
-                                      <div>
-                                          <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Uploaded</div>
-                                          <div className={`font-mono ${styles.textMain}`}>{editForm.uploadedAt}</div>
-                                      </div>
-                                  </div>
-                              </div>
-                              <div className="bg-black/10 rounded p-3 text-xs space-y-2 font-mono">
-                                  <div>
-                                      <div className="opacity-50 mb-0.5">MD5</div>
-                                      <div className="break-all opacity-80 select-all">d41d8cd98f00b204e9800998ecf8427e</div>
-                                  </div>
-                                  <div className="pt-2 border-t border-gray-500/20">
-                                      <div className="opacity-50 mb-0.5">SHA256</div>
-                                      <div className="break-all opacity-80 select-all">e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</div>
-                                  </div>
-                              </div>
-                          </div>
-                      </div>
+                      {/* Removed Release Configuration as requested */}
 
                       {/* Dependencies Editing Section */}
                       <div className={`p-4 rounded border ${styles.input}`}>
@@ -1869,7 +1795,7 @@ export const AgentHub: React.FC = () => {
                   <tbody className={styles.textMain}>
                       {filteredReleases.map(item => {
                           const isReleased = item.targets.length > 0;
-                          const isDeprecated = item.status === 'deprecated';
+                          const isDecommissioned = item.status === 'decommissioned';
 
                           return (
                           <tr 
@@ -1943,9 +1869,9 @@ export const AgentHub: React.FC = () => {
 
                               {/* Release Status */}
                               <td className="p-4 align-top">
-                                  {isDeprecated ? (
+                                  {isDecommissioned ? (
                                       <div className="flex items-center gap-1.5 text-[10px] font-bold text-red-500 bg-red-500/10 px-2 py-1 rounded w-fit border border-red-500/20">
-                                          <Ban size={10} /> DEPRECATED
+                                          <Ban size={10} /> DECOMMISSIONED
                                       </div>
                                   ) : isReleased ? (
                                       <div className="flex items-center gap-1.5 text-[10px] font-bold text-green-500 bg-green-500/10 px-2 py-1 rounded w-fit border border-green-500/20">
@@ -1960,7 +1886,7 @@ export const AgentHub: React.FC = () => {
 
                               {/* Channels */}
                               <td className="p-4 align-top">
-                                  {!isDeprecated && isReleased ? (
+                                  {!isDecommissioned && isReleased ? (
                                       <div className="flex flex-wrap gap-1 max-w-[120px]">
                                           {item.channels.length > 0 ? item.channels.map(c => (
                                               <Badge key={c} colorClass="bg-blue-500/20 text-blue-400 border border-blue-500/30">{c}</Badge>
@@ -1980,8 +1906,8 @@ export const AgentHub: React.FC = () => {
                                           <button 
                                             title={isReleased ? "Manage Release" : "Release Now"}
                                             onClick={(e) => { e.stopPropagation(); setSelectedPackage(item); setIsReleaseOpen(true); }}
-                                            disabled={item.status === 'deprecated'}
-                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all ${item.status === 'deprecated' ? 'bg-gray-500 opacity-50 cursor-not-allowed' : (theme === AppTheme.LIGHT ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-500/20')}`}
+                                            disabled={item.status === 'decommissioned'}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all ${item.status === 'decommissioned' ? 'bg-gray-500 opacity-50 cursor-not-allowed' : (theme === AppTheme.LIGHT ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-500/20')}`}
                                           >
                                               <Rocket size={12} /> {isReleased ? 'Manage' : 'Release'}
                                           </button>
