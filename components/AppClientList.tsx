@@ -431,12 +431,14 @@ export const AppClientList: React.FC = () => {
                                         </div>
                                         
                                         <div className="flex flex-col">
-                                            {/* Product Name */}
-                                            <span className="text-base font-bold leading-tight">{client.product}</span>
+                                            {/* Series Name (Swapped: Now Main) */}
+                                            <span className="text-base font-bold leading-tight">{client.series}</span>
                                             
                                             {/* Metadata Line */}
                                             <div className="flex items-center gap-1.5 mt-1 text-xs opacity-70">
-                                                <span className={`${theme === AppTheme.LIGHT ? 'text-blue-600' : 'text-blue-400'} font-medium`}>{client.series}</span>
+                                                {/* Product Name (Swapped: Now here) */}
+                                                <span className={`${theme === AppTheme.LIGHT ? 'text-blue-600' : 'text-blue-400'} font-medium`}>{client.product}</span>
+                                                
                                                 <span className="w-1 h-1 rounded-full bg-current opacity-30"></span>
                                                 <span>{client.platform}</span>
                                                 <span className="w-1 h-1 rounded-full bg-current opacity-30"></span>

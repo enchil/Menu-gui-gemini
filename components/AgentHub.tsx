@@ -1787,6 +1787,7 @@ export const AgentHub: React.FC = () => {
                           <th className="p-4 font-semibold">Series</th>
                           <th className="p-4 font-semibold">Version Info</th>
                           <th className="p-4 font-semibold">Dependencies</th>
+                          <th className="p-4 font-semibold">Release To</th>
                           <th className="p-4 font-semibold">Status</th>
                           <th className="p-4 font-semibold">Channels</th>
                           <th className="p-4 font-semibold text-right">Actions</th>
@@ -1865,6 +1866,30 @@ export const AgentHub: React.FC = () => {
                                           <span className="font-mono">Agent v{item.dependencies.major}.{item.dependencies.minor}</span>
                                       </div>
                                   )}
+                              </td>
+
+                              {/* Release To */}
+                              <td className="p-4 align-top">
+                                  <div className="flex items-center gap-1.5">
+                                      {item.targets.length > 0 ? item.targets.map(t => (
+                                          <div key={t} className="relative group/icon">
+                                             {t.includes('Spotlight') ? (
+                                                 <div className="p-1.5 rounded-md bg-purple-500/10 text-purple-500 border border-purple-500/20">
+                                                    <Globe size={14} />
+                                                 </div>
+                                             ) : (
+                                                 <div className="p-1.5 rounded-md bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                                                    <Zap size={14} />
+                                                 </div>
+                                             )}
+                                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-2 py-1 bg-black text-white text-[10px] rounded opacity-0 group-hover/icon:opacity-100 pointer-events-none transition-opacity z-50">
+                                                 {t}
+                                             </div>
+                                          </div>
+                                      )) : (
+                                          <span className="text-[10px] opacity-30">-</span>
+                                      )}
+                                  </div>
                               </td>
 
                               {/* Release Status */}
