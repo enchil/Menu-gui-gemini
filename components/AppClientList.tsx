@@ -409,7 +409,7 @@ export const AppClientList: React.FC = () => {
               <table className="w-full text-left text-sm border-collapse">
                   <thead>
                       <tr className={styles.header}>
-                          <th className="p-4 font-semibold w-[350px]">Client Definition</th>
+                          <th className="p-4 font-semibold w-[300px]">Client Definition</th>
                           <th className="p-4 font-semibold">Access Type</th>
                           <th className="p-4 font-semibold">Product Key</th>
                           <th className="p-4 font-semibold">Bound Customers</th>
@@ -422,37 +422,25 @@ export const AppClientList: React.FC = () => {
                           const isPublic = client.accessType === 'Public';
                           return (
                             <tr key={client.id} className={styles.row}>
-                                {/* Client Definition (Overhauled) */}
+                                {/* Client Definition (Simplified) */}
                                 <td className="p-4 align-top">
-                                    <div className="flex items-start gap-4">
-                                        {/* Big Icon */}
-                                        <div className={`p-3 rounded-lg shrink-0 ${theme === AppTheme.LIGHT ? 'bg-gray-100 text-gray-600' : 'bg-white/5 text-gray-400'}`}>
-                                            <Icon size={24} />
+                                    <div className="flex items-center gap-3">
+                                        {/* Icon */}
+                                        <div className={`p-2.5 rounded-md shrink-0 ${theme === AppTheme.LIGHT ? 'bg-gray-100 text-gray-600' : 'bg-white/5 text-gray-400'}`}>
+                                            <Icon size={20} />
                                         </div>
                                         
                                         <div className="flex flex-col">
-                                            {/* Product Name & Series */}
-                                            <div className="flex flex-col">
-                                                <span className="text-lg font-bold tracking-tight leading-tight">{client.product}</span>
-                                                <div className="flex items-center gap-2 mt-0.5">
-                                                    <span className={`text-[10px] font-bold uppercase tracking-wider opacity-60`}>SERIES:</span>
-                                                    <span className={`text-sm font-bold ${theme === AppTheme.LIGHT ? 'text-blue-600' : 'text-blue-400'}`}>{client.series}</span>
-                                                </div>
-                                            </div>
-
-                                            {/* Metadata Row */}
-                                            <div className="flex flex-wrap items-center gap-2 mt-2">
-                                                {client.platform === 'Android' && <Badge className="bg-green-500/10 text-green-500 border-green-500/20" icon={Smartphone}>{client.platform}</Badge>}
-                                                {client.platform === 'Windows' && <Badge className="bg-blue-400/10 text-blue-400 border-blue-400/20" icon={Monitor}>{client.platform}</Badge>}
-                                                {client.platform === 'Linux' && <Badge className="bg-orange-400/10 text-orange-400 border-orange-400/20" icon={Terminal}>{client.platform}</Badge>}
-                                                
-                                                <Badge className="bg-purple-500/10 text-purple-500 border-purple-500/20" icon={Cpu}>{client.arch}</Badge>
-
-                                                {/* File Count */}
-                                                <div className={`text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 border border-transparent ${client.fileCount > 0 ? 'bg-indigo-500/10 text-indigo-500' : 'bg-gray-500/10 text-gray-500 opacity-50'}`}>
-                                                    <Archive size={10} />
-                                                    <span>{client.fileCount} Ver</span>
-                                                </div>
+                                            {/* Product Name */}
+                                            <span className="text-base font-bold leading-tight">{client.product}</span>
+                                            
+                                            {/* Metadata Line */}
+                                            <div className="flex items-center gap-1.5 mt-1 text-xs opacity-70">
+                                                <span className={`${theme === AppTheme.LIGHT ? 'text-blue-600' : 'text-blue-400'} font-medium`}>{client.series}</span>
+                                                <span className="w-1 h-1 rounded-full bg-current opacity-30"></span>
+                                                <span>{client.platform}</span>
+                                                <span className="w-1 h-1 rounded-full bg-current opacity-30"></span>
+                                                <span className="font-mono">{client.arch}</span>
                                             </div>
                                         </div>
                                     </div>

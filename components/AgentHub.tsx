@@ -86,6 +86,8 @@ interface ReleasePackage {
   status: 'active' | 'deprecated'; // explicit status
   channels: ReleaseChannel[]; // New: Active channels
   targets: ReleaseTarget[];   // New: Where it is released
+  scope?: 'Generic' | 'Customized';
+  customers?: string[];
   identityKey?: string;
   description: string;
   releaseNotes: string;
@@ -100,6 +102,7 @@ const MOCK_RELEASES: ReleasePackage[] = [
     supportOS: ['Android 13', 'Android 12', 'AuraOS 5', 'FT GMS 12'], version: '2.5.0', filename: 'agent-ft-gms-x64-v2.5.apk', 
     size: '24 MB', uploadedAt: '2025-10-20', uploader: 'admin@corp.com', status: 'active', identityKey: 'KEY-8829-X',
     channels: ['Production'], targets: ['Automation Update Service', 'Spotlight Download Page'],
+    scope: 'Generic', customers: [],
     description: 'Main production agent for GMS devices.',
     releaseNotes: '# v2.5.0\n- Initial GMS support\n- Fixed Wifi bug',
     dependencies: { major: '2', minor: '1', patch: '0', isStandalone: false },
@@ -114,6 +117,7 @@ const MOCK_RELEASES: ReleasePackage[] = [
     supportOS: ['Win 10 IoT', 'Win 11', 'Modern Kiosk'], version: '10.0.19044', filename: 'agent_win_x64.zip', 
     size: '1.2 GB', uploadedAt: '2025-10-18', uploader: 'devops@corp.com', status: 'active',
     channels: ['Beta'], targets: ['Automation Update Service'],
+    scope: 'Customized', customers: ['RetailCorp'],
     description: 'Windows IoT Core agent runtime.',
     releaseNotes: '# v10.0\n- Win 11 compat layer',
     dependencies: { major: '', minor: '', patch: '', isStandalone: true },
@@ -126,6 +130,7 @@ const MOCK_RELEASES: ReleasePackage[] = [
     supportOS: ['Ubuntu 22.04', 'Debian 11'], version: '1.0.5', filename: 'log-collector-linux.sh', 
     size: '15 KB', uploadedAt: '2025-09-05', uploader: 'support@corp.com', status: 'deprecated',
     channels: [], targets: [],
+    scope: 'Generic', customers: [],
     description: 'Debug script for log retrieval.',
     releaseNotes: 'Fixed permission issue.',
     dependencies: { major: '', minor: '', patch: '', isStandalone: true },
@@ -139,6 +144,7 @@ const MOCK_RELEASES: ReleasePackage[] = [
     supportOS: ['AuraOS 6'], version: '6.0.0-rc1', filename: 'aura_os_6_rc1.zip', 
     size: '850 MB', uploadedAt: '2025-11-01', uploader: 'qa@corp.com', status: 'active',
     channels: [], targets: [], // Not Released yet
+    scope: 'Customized', customers: ['FastFood Chain A'],
     description: 'Release Candidate for AuraOS 6',
     releaseNotes: 'RC1 Build.',
     dependencies: { major: '', minor: '', patch: '', isStandalone: true },
@@ -254,6 +260,10 @@ export const AgentHub: React.FC = () => {
   const [isStatusOpen, setIsStatusOpen] = useState(false); // Status/Delete Modal
   const [selectedPackage, setSelectedPackage] = useState<ReleasePackage | null>(null);
 
+  // Force Update to refresh table when modals change data
+  const [_, setTick] = useState(0);
+  const handleRefresh = () => setTick(t => t + 1);
+
   // Filter States
   const [filterProduct, setFilterProduct] = useState<string>('All');
   const [filterPlatform, setFilterPlatform] = useState<string>('All');
@@ -314,7 +324,7 @@ export const AgentHub: React.FC = () => {
           stepInactive: 'bg-slate-800 border-2 border-slate-600 text-gray-500',
           inputGroup: 'bg-slate-900 border-slate-600 text-gray-200',
           tabActive: 'border-b-2 border-blue-500 text-blue-400',
-          tabInactive: 'text-gray-500 hover:text-gray-300'
+          tabInactive: 'text-gray-400 hover:text-gray-300'
         };
     }
   };
@@ -414,6 +424,7 @@ export const AgentHub: React.FC = () => {
         }
         setIsStatusOpen(false);
         setSelectedPackage(null);
+        handleRefresh();
     };
 
     const getConfirmConfig = () => {
@@ -557,42 +568,118 @@ export const AgentHub: React.FC = () => {
         }
         setIsEditing(false);
         setIsDetailOpen(false);
+        handleRefresh();
     };
 
     return (
       <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${styles.modalOverlay}`}>
-          <div className={`w-full max-w-4xl rounded-xl shadow-2xl border flex flex-col h-[80vh] ${styles.modalBg}`}>
-              <div className="p-6 border-b border-inherit flex justify-between items-start">
-                  <div className="flex items-start gap-4">
-                      <div className={`p-3 rounded-lg ${theme === AppTheme.LIGHT ? 'bg-blue-100 text-blue-600' : 'bg-blue-500/20 text-blue-400'}`}><Package size={24} /></div>
+          <div className={`w-full max-w-4xl rounded-xl shadow-2xl border flex flex-col h-[85vh] ${styles.modalBg}`}>
+              <div className="p-6 border-b border-inherit flex justify-between items-center">
+                  <div className="flex items-center gap-4">
+                      <div className={`p-3 rounded-lg ${theme === AppTheme.LIGHT ? 'bg-blue-100 text-blue-600' : 'bg-blue-500/20 text-blue-400'}`}><Package size={28} /></div>
                       <div>
-                          <div className="text-xs font-bold uppercase opacity-50 mb-1">Package Detail</div>
-                          <h2 className={`text-xl font-bold ${styles.textMain} flex items-center gap-2`}>{editForm.filename}{editForm.status === 'deprecated' ? <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-500 border border-red-500/20">Deprecated</span> : (editForm.targets.length > 0 ? <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 border border-green-500/20">Released</span> : <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-gray-500/20 text-gray-500 border border-gray-500/20">Not Released</span>)}</h2>
-                          <div className={`flex items-center gap-4 text-xs mt-1 ${styles.textSub}`}><span className="flex items-center gap-1"><Monitor size={12}/> {editForm.platform} / {editForm.series}</span><span className="flex items-center gap-1"><Cpu size={12}/> {editForm.arch.join(', ')}</span><span className="flex items-center gap-1"><Clock size={12}/> {editForm.uploadedAt}</span></div>
+                          <div className="flex items-center gap-3">
+                              <h2 className={`text-2xl font-bold ${styles.textMain}`}>Application Detail</h2>
+                              {editForm.status === 'deprecated' ? (
+                                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-500 border border-red-500/20">Deprecated</span>
+                              ) : editForm.targets.length > 0 ? (
+                                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 border border-green-500/20">Released</span>
+                              ) : (
+                                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-gray-500/20 text-gray-500 border border-gray-500/20">Not Released</span>
+                              )}
+                          </div>
                       </div>
                   </div>
                   <div className="flex items-center gap-2">
                       {!isEditing ? (
                           selectedPackage.status !== 'deprecated' && (
-                            <button onClick={() => setIsEditing(true)} className={`px-3 py-1.5 text-sm rounded-md border flex items-center gap-2 hover:bg-opacity-10 hover:bg-blue-500 transition-colors ${styles.textMain} border-inherit`}><Edit3 size={14} /> Edit Details</button>
+                            <button onClick={() => setIsEditing(true)} className={`px-4 py-2 text-sm rounded-md border flex items-center gap-2 hover:bg-opacity-10 hover:bg-blue-500 transition-colors ${styles.textMain} border-inherit`}><Edit3 size={14} /> Edit Details</button>
                           )
                       ) : <div className="flex gap-2"><button onClick={() => { setIsEditing(false); setEditForm(selectedPackage); }} className="px-3 py-1.5 text-sm rounded-md border border-red-500/30 text-red-500 hover:bg-red-500/10">Cancel</button><button onClick={handleSave} className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-2 ${styles.buttonPrimary}`}><Save size={14} /> Save Changes</button></div>}
                       <button onClick={() => setIsDetailOpen(false)} className={`p-2 hover:text-red-500 transition-colors ${styles.textSub}`}><X size={20} /></button>
                   </div>
               </div>
-              <div className={`flex px-6 border-b border-inherit gap-6 ${styles.textSub}`}><button onClick={() => setActiveTab('general')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'general' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>General & Docs</button><button onClick={() => setActiveTab('compat')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'compat' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>Compatibility</button><button onClick={() => setActiveTab('activity')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'activity' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>File Activity</button></div>
+              <div className={`flex px-6 border-b border-inherit gap-6 ${styles.textSub}`}><button onClick={() => setActiveTab('general')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'general' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>MANIFEST & Docs</button><button onClick={() => setActiveTab('compat')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'compat' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>Compatibility</button><button onClick={() => setActiveTab('activity')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'activity' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>File Activity</button></div>
               <div className="flex-1 overflow-y-auto p-6 bg-opacity-50">
                   {activeTab === 'general' && <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-                      <div className={`p-4 rounded border ${theme === AppTheme.LIGHT ? 'bg-gray-50 border-gray-200' : 'bg-black/20 border-white/10'}`}>
-                          <h4 className={`text-xs font-bold uppercase mb-3 ${styles.textSub}`}>Release Configuration</h4>
-                          <div className="grid grid-cols-2 gap-4">
+                      
+                      {/* Section 1: Package Identity */}
+                      <div className={`p-5 rounded-lg border ${styles.input} bg-opacity-30`}>
+                          <h4 className={`text-xs font-bold uppercase mb-4 tracking-wider flex items-center gap-2 ${styles.textSub}`}>
+                              <Fingerprint size={14}/> Package Identity
+                          </h4>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-y-4 gap-x-8 text-sm">
                               <div>
-                                  <div className="text-[10px] opacity-60 mb-1">ACTIVE CHANNELS</div>
-                                  <div className="flex flex-wrap gap-2">{editForm.channels.length > 0 ? editForm.channels.map(c => <Badge key={c} colorClass="bg-blue-500/20 text-blue-400 border border-blue-500/30">{c}</Badge>) : <span className="text-sm opacity-50 italic">None</span>}</div>
+                                  <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Product</div>
+                                  <div className={`font-bold flex items-center gap-2 ${styles.textMain}`}>
+                                      {editForm.product === 'Agent' && <Monitor size={16} className="text-blue-500"/>}
+                                      {editForm.product === 'OTA Img' && <Layers size={16} className="text-purple-500"/>}
+                                      {editForm.product === 'Tool' && <Wrench size={16} className="text-orange-500"/>}
+                                      {editForm.product}
+                                  </div>
                               </div>
                               <div>
-                                  <div className="text-[10px] opacity-60 mb-1">RELEASE TARGETS</div>
-                                  <div className="space-y-1">{editForm.targets.length > 0 ? editForm.targets.map(t => <div key={t} className="flex items-center gap-2 text-sm font-medium">{t.includes('Spotlight') ? <Globe size={14} className="text-purple-400"/> : <Zap size={14} className="text-orange-400"/>}<span>{t}</span></div>) : <span className="text-sm opacity-50 italic">Not Released</span>}</div>
+                                  <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Platform</div>
+                                  <div className={`font-medium ${styles.textMain}`}>{editForm.platform}</div>
+                              </div>
+                              <div>
+                                  <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Series</div>
+                                  <div className={`font-medium ${styles.textMain}`}>{editForm.series}</div>
+                              </div>
+                              <div>
+                                  <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Architecture</div>
+                                  <div className={`font-mono text-xs px-2 py-1 rounded bg-black/20 w-fit ${styles.textMain}`}>{editForm.arch.join(', ')}</div>
+                              </div>
+                              
+                              <div className="col-span-2 md:col-span-4 pt-3 mt-1 border-t border-gray-500/20">
+                                  <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Release Scope</div>
+                                  {editForm.scope === 'Generic' ? (
+                                      <div className="flex items-center gap-2 text-blue-500 font-medium">
+                                          <Globe size={16} /> 
+                                          <span>Generic Release</span>
+                                          <span className="text-xs opacity-60 font-normal ml-2">(Available to all customers)</span>
+                                      </div>
+                                  ) : (
+                                      <div className="flex items-center gap-2 text-amber-500 font-medium">
+                                          <Lock size={16} /> 
+                                          <span>Customized: {editForm.customers?.join(', ')}</span>
+                                      </div>
+                                  )}
+                              </div>
+                          </div>
+                      </div>
+
+                      {/* Section 2: File Artifact */}
+                      <div className={`p-5 rounded-lg border ${styles.input} bg-opacity-30`}>
+                          <h4 className={`text-xs font-bold uppercase mb-4 tracking-wider flex items-center gap-2 ${styles.textSub}`}>
+                              <FileBox size={14}/> File Artifact
+                          </h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div className="space-y-4">
+                                  <div>
+                                      <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Filename</div>
+                                      <div className={`font-mono font-bold text-base truncate ${styles.textMain}`} title={editForm.filename}>{editForm.filename}</div>
+                                  </div>
+                                  <div className="flex gap-8">
+                                      <div>
+                                          <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Size</div>
+                                          <div className={`font-mono ${styles.textMain}`}>{editForm.size}</div>
+                                      </div>
+                                      <div>
+                                          <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Uploaded</div>
+                                          <div className={`font-mono ${styles.textMain}`}>{editForm.uploadedAt}</div>
+                                      </div>
+                                  </div>
+                              </div>
+                              <div className="bg-black/10 rounded p-3 text-xs space-y-2 font-mono">
+                                  <div>
+                                      <div className="opacity-50 mb-0.5">MD5</div>
+                                      <div className="break-all opacity-80 select-all">d41d8cd98f00b204e9800998ecf8427e</div>
+                                  </div>
+                                  <div className="pt-2 border-t border-gray-500/20">
+                                      <div className="opacity-50 mb-0.5">SHA256</div>
+                                      <div className="break-all opacity-80 select-all">e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</div>
+                                  </div>
                               </div>
                           </div>
                       </div>
@@ -713,11 +800,52 @@ export const AgentHub: React.FC = () => {
     const getAvailableSeries = () => {
         let list = getSeriesForPlatform(formData.platform, formData.product);
         if (formData.releaseType === 'Customized' && formData.selectedCustomer) {
-            if (formData.selectedCustomer === 'RetailCorp') return list.filter(s => s.includes('GMS') || s === 'Universal');
-            if (formData.selectedCustomer === 'FastFood Chain A') return list.filter(s => s === 'Aura' || s === 'Universal');
+            // Simplified logic: If customized, we might want to show specific custom series available for that customer
+            // But if user wants to select a customized series specifically, we will handle that in the UI render.
             return list; 
         }
         return list;
+    };
+
+    // Helper to get mocked custom series for a customer
+    const getCustomizedSeriesOptions = () => {
+        if (!formData.selectedCustomer) return [];
+        // Mocking some customized series
+        return [`${formData.selectedCustomer}-Series-1`, `${formData.selectedCustomer}-Special`, `Legacy-${formData.selectedCustomer}`];
+    };
+
+    const handleSubmit = () => {
+        setIsSuccess(true);
+        // Add to Mock Data
+        const newPkg: ReleasePackage = {
+            id: `${Date.now()}`,
+            product: formData.product as ProductType,
+            platform: formData.platform as PlatformType,
+            series: isCustomSeriesMode ? formData.customSeries : formData.series,
+            arch: [formData.arch as ArchType],
+            supportOS: formData.selectedTargets.map(id => MOCK_TARGETS.find(t => t.id === id)?.name || ''),
+            version: `${formData.versionMajor}.${formData.versionMinor}.${formData.versionPatch}`,
+            filename: file ? file.name : `${formData.product}_${formData.platform}_${formData.versionMajor}.${formData.versionMinor}.${formData.versionPatch}.zip`,
+            size: '24.5 MB', // Mock
+            uploadedAt: new Date().toISOString().split('T')[0],
+            uploader: 'current_user@corp.com',
+            status: 'active',
+            channels: [], // Initially no channels active
+            targets: [], // Initially not released
+            scope: formData.releaseType,
+            customers: formData.releaseType === 'Customized' && formData.selectedCustomer ? [formData.selectedCustomer] : [],
+            description: formData.description,
+            releaseNotes: formData.releaseNotes,
+            dependencies: { 
+                major: '0', minor: '0', patch: '0', // Simplification for mock
+                isStandalone: formData.isStandalone 
+            },
+            activityLog: [
+                { id: `log-${Date.now()}`, user: 'current_user', action: 'Uploaded package', timestamp: new Date().toLocaleString() }
+            ]
+        };
+        MOCK_RELEASES.unshift(newPkg); // Add to top
+        handleRefresh();
     };
 
     // Effects
@@ -836,6 +964,9 @@ export const AgentHub: React.FC = () => {
         const availableSeries = getAvailableSeries();
         const availableArchs = getArchsForConfig(formData.platform, isCustomSeriesMode ? formData.customSeries : formData.series, isCustomSeriesMode);
         
+        // Customized series logic
+        const customizedSeriesOptions = getCustomizedSeriesOptions();
+
         return (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full animate-in fade-in slide-in-from-right-4">
                 <div className="lg:col-span-2 space-y-6">
@@ -844,7 +975,64 @@ export const AgentHub: React.FC = () => {
                         <div className="space-y-2"><label className={`text-xs font-bold uppercase ${styles.textSub}`}>Platform</label><select className={`w-full p-3 rounded-lg border ${styles.input}`} value={formData.platform} onChange={(e) => setFormData({...formData, platform: e.target.value})}>{availablePlatforms.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2"><label className={`text-xs font-bold uppercase ${styles.textSub}`}>Series</label>{isCustomSeriesMode ? (<div className="relative"><input type="text" autoFocus placeholder="Enter Series Name" value={formData.customSeries} onChange={(e) => setFormData({...formData, customSeries: e.target.value})} className={`w-full pl-3 pr-8 py-3 rounded-lg border ${styles.input}`} /><div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1"><span className="text-[9px] font-bold bg-blue-500 text-white px-1.5 py-0.5 rounded uppercase">New</span><button onClick={() => setIsCustomSeriesMode(false)}><X size={14} /></button></div></div>) : (<select className={`w-full p-3 rounded-lg border ${styles.input}`} value={formData.series} onChange={(e) => { if (e.target.value === '__NEW__') { setIsCustomSeriesMode(true); setFormData({...formData, customSeries: ''}); } else { setFormData({...formData, series: e.target.value}); } }}>{availableSeries.map(p => <option key={p} value={p}>{p}</option>)}<option value="__NEW__" className="font-bold text-blue-500">+ Create New Series...</option></select>)}</div>
+                        <div className="space-y-2">
+                            <label className={`text-xs font-bold uppercase ${styles.textSub} flex items-center gap-2`}>
+                                Series 
+                                {formData.releaseType === 'Customized' && <span className="text-[9px] bg-amber-500 text-white px-1.5 py-0.5 rounded">CUSTOM</span>}
+                            </label>
+                            
+                            {/* Render different Series selection if Customized */}
+                            {formData.releaseType === 'Customized' ? (
+                                <div className="relative">
+                                    {isCustomSeriesMode ? (
+                                        <div className="relative">
+                                            <input type="text" autoFocus placeholder="Enter Custom Series Name" value={formData.customSeries} onChange={(e) => setFormData({...formData, customSeries: e.target.value})} className={`w-full pl-3 pr-8 py-3 rounded-lg border ${styles.input} border-amber-500/50`} />
+                                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                                <button onClick={() => setIsCustomSeriesMode(false)}><X size={14} /></button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <select 
+                                            className={`w-full p-3 rounded-lg border ${styles.input} border-amber-500/30`} 
+                                            value={formData.series} 
+                                            onChange={(e) => { 
+                                                if (e.target.value === '__NEW__') { 
+                                                    setIsCustomSeriesMode(true); 
+                                                    setFormData({...formData, customSeries: ''}); 
+                                                } else { 
+                                                    setFormData({...formData, series: e.target.value}); 
+                                                } 
+                                            }}
+                                        >
+                                            <option value="">Select Customized Series...</option>
+                                            <optgroup label="Customer Specific">
+                                                {customizedSeriesOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                                            </optgroup>
+                                            <optgroup label="Standard Base">
+                                                {availableSeries.map(p => <option key={p} value={p}>{p}</option>)}
+                                            </optgroup>
+                                            <option value="__NEW__" className="font-bold text-amber-500">+ Create New Series...</option>
+                                        </select>
+                                    )}
+                                </div>
+                            ) : (
+                                // Standard Series Selection
+                                isCustomSeriesMode ? (
+                                    <div className="relative">
+                                        <input type="text" autoFocus placeholder="Enter Series Name" value={formData.customSeries} onChange={(e) => setFormData({...formData, customSeries: e.target.value})} className={`w-full pl-3 pr-8 py-3 rounded-lg border ${styles.input}`} />
+                                        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                            <span className="text-[9px] font-bold bg-blue-500 text-white px-1.5 py-0.5 rounded uppercase">New</span>
+                                            <button onClick={() => setIsCustomSeriesMode(false)}><X size={14} /></button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <select className={`w-full p-3 rounded-lg border ${styles.input}`} value={formData.series} onChange={(e) => { if (e.target.value === '__NEW__') { setIsCustomSeriesMode(true); setFormData({...formData, customSeries: ''}); } else { setFormData({...formData, series: e.target.value}); } }}>
+                                        {availableSeries.map(p => <option key={p} value={p}>{p}</option>)}
+                                        <option value="__NEW__" className="font-bold text-blue-500">+ Create New Series...</option>
+                                    </select>
+                                )
+                            )}
+                        </div>
                         <div className="space-y-2"><label className={`text-xs font-bold uppercase ${styles.textSub}`}>Architecture</label><div className={`relative`}><Cpu size={18} className={`absolute left-3 top-1/2 -translate-y-1/2 ${styles.textSub}`} /><select className={`w-full pl-10 p-3 rounded-lg border ${styles.input}`} value={formData.arch} onChange={(e) => setFormData({...formData, arch: e.target.value})}>{availableArchs.map(a => <option key={a} value={a}>{a}</option>)}</select></div></div>
                     </div>
                     <div className="space-y-2">
@@ -1174,7 +1362,6 @@ export const AgentHub: React.FC = () => {
         );
     };
 
-    // ... (renderSuccess & Modal Wrapper existing code)
     const renderSuccess = () => (
         <div className="flex flex-col items-center justify-center h-full animate-in zoom-in-95 duration-500">
              <div className="w-24 h-24 bg-green-500 text-white rounded-full flex items-center justify-center mb-6 shadow-xl shadow-green-500/20">
@@ -1225,7 +1412,7 @@ export const AgentHub: React.FC = () => {
                         <div className="flex gap-3">
                             {step > 1 && <button onClick={() => setStep(step - 1)} className={`px-6 py-2 rounded-lg border ${styles.textMain}`}>Back</button>}
                             <button 
-                                onClick={() => { if(step < 6) { if(step === 4 && !file) return; setStep(step + 1); } else { setIsSuccess(true); } }} 
+                                onClick={() => { if(step < 6) { if(step === 4 && !file) return; setStep(step + 1); } else { handleSubmit(); } }} 
                                 disabled={(step === 4 && !file) || (step === 2 && isDuplicateVersion) || (step === 1 && formData.releaseType === 'Customized' && !formData.selectedCustomer)} 
                                 className={`px-8 py-2 rounded-lg font-medium shadow-lg flex items-center gap-2 ${(step === 4 && !file) || (step === 2 && isDuplicateVersion) || (step === 1 && formData.releaseType === 'Customized' && !formData.selectedCustomer) ? 'opacity-50 cursor-not-allowed bg-gray-500' : styles.buttonPrimary}`}
                             >
@@ -1312,6 +1499,7 @@ export const AgentHub: React.FC = () => {
                   ]};
               }
               setStatus('success');
+              handleRefresh();
           }, 1500);
       };
 
@@ -1717,11 +1905,19 @@ export const AgentHub: React.FC = () => {
                                   </div>
                               </td>
 
-                              {/* Series */}
+                              {/* Series (Scope Icon Added Here) */}
                               <td className="p-4 align-top">
-                                  <div className="text-sm font-medium">
-                                      {item.series}
-                                  </div>
+                                  {item.scope === 'Customized' ? (
+                                      <div className="flex items-center gap-1.5 text-amber-500" title={`Customized: ${item.customers?.join(', ')}`}>
+                                          <Lock size={14} />
+                                          <span className="text-sm font-medium">{item.series}</span>
+                                      </div>
+                                  ) : (
+                                      <div className="flex items-center gap-1.5 text-blue-500" title="Generic Release">
+                                          <Globe size={14} />
+                                          <span className="text-sm font-medium">{item.series}</span>
+                                      </div>
+                                  )}
                               </td>
 
                               {/* Version Info */}
