@@ -22,7 +22,10 @@ import {
   FileBox,
   Globe,
   Lock,
-  AlertCircle
+  AlertCircle,
+  Ban,
+  RotateCcw,
+  Activity
 } from 'lucide-react';
 
 // --- Types ---
@@ -34,8 +37,9 @@ interface AppClient {
   arch: string;
   productKey: string;
   fileCount: number;
-  accessType: 'Public' | 'Customized'; // New Field
+  accessType: 'Public' | 'Customized'; 
   customers: string[]; // Bound customers (Empty if Public)
+  status: 'active' | 'decommissioned'; // New Field
   createdAt: string;
 }
 
@@ -55,23 +59,23 @@ const MOCK_CLIENTS: AppClient[] = [
   { 
       id: 'c1', product: 'Agent', platform: 'Android', series: 'FT-GMS', arch: 'x86_64', 
       productKey: 'PROD-8821-X', fileCount: 12, accessType: 'Customized',
-      customers: ['RetailCorp', 'FastFood Chain A'], createdAt: '2025-01-10' 
+      customers: ['RetailCorp', 'FastFood Chain A'], status: 'active', createdAt: '2025-01-10' 
   },
   { 
       id: 'c2', product: 'Agent', platform: 'Windows', series: 'Universal', arch: 'x86_64', 
       productKey: 'WIN-9921-A', fileCount: 5, accessType: 'Public',
-      customers: [], createdAt: '2025-01-12' 
+      customers: [], status: 'active', createdAt: '2025-01-12' 
   },
   { 
       id: 'c3', product: 'OTA Img', platform: 'Android', series: 'Aura', arch: 'arm64', 
       productKey: 'OTA-0012-Z', fileCount: 0, accessType: 'Customized',
       customers: [], // Needs binding warning
-      createdAt: '2025-02-01' 
+      status: 'active', createdAt: '2025-02-01' 
   },
   {
       id: 'c4', product: 'Tool', platform: 'Linux', series: 'Universal', arch: 'x86_64',
       productKey: 'TOOL-LIN-01', fileCount: 3, accessType: 'Public',
-      customers: [], createdAt: '2025-02-15'
+      customers: [], status: 'decommissioned', createdAt: '2025-02-15'
   }
 ];
 
@@ -82,6 +86,7 @@ export const AppClientList: React.FC = () => {
   // Modals
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCustomerOpen, setIsCustomerOpen] = useState(false);
+  const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<AppClient | null>(null);
 
   // Styles
@@ -140,6 +145,52 @@ export const AppClientList: React.FC = () => {
     </span>
   );
 
+  const StatusChangeModal = () => {
+      if (!selectedClient) return null;
+      const isDecommissioning = selectedClient.status === 'active';
+
+      const handleConfirm = () => {
+          const newStatus = isDecommissioning ? 'decommissioned' : 'active';
+          const updated = clients.map(c => c.id === selectedClient.id ? { ...c, status: newStatus as any } : c);
+          setClients(updated);
+          setIsStatusOpen(false);
+          setSelectedClient(null);
+      };
+
+      return (
+          <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${styles.modalOverlay}`}>
+              <div className={`w-full max-w-md rounded-xl shadow-2xl border p-6 flex flex-col ${styles.modalBg} animate-in zoom-in-95 duration-200`}>
+                  <div className="flex flex-col items-center text-center">
+                      <div className={`p-4 rounded-full bg-opacity-10 mb-4 ${isDecommissioning ? 'bg-amber-500 text-amber-500' : 'bg-green-500 text-green-500'}`}>
+                          {isDecommissioning ? <Ban size={48} /> : <RotateCcw size={48} />}
+                      </div>
+                      <h3 className={`text-xl font-bold ${styles.textMain}`}>
+                          {isDecommissioning ? 'Decommission Client?' : 'Reactivate Client?'}
+                      </h3>
+                      <p className={`text-sm ${styles.textSub} mt-2`}>
+                          {isDecommissioning 
+                              ? 'This will stop all future updates for this client ID. Existing installations may continue to work but will be flagged.' 
+                              : 'This will restore the client to Active status, allowing new updates and management.'}
+                      </p>
+                      
+                      <div className={`mt-4 p-3 rounded text-xs w-full text-left flex gap-2 ${isDecommissioning ? 'bg-amber-500/10 border border-amber-500/20 text-amber-500' : 'bg-green-500/10 border border-green-500/20 text-green-500'}`}>
+                          <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                          <div>
+                              <strong>Target:</strong> {selectedClient.product} / {selectedClient.series} ({selectedClient.platform})
+                          </div>
+                      </div>
+                  </div>
+                  <div className="flex gap-3 mt-6">
+                      <button onClick={() => setIsStatusOpen(false)} className={`flex-1 py-2.5 rounded-lg font-medium border border-inherit ${styles.textSub} hover:bg-white/5`}>Cancel</button>
+                      <button onClick={handleConfirm} className={`flex-1 py-2.5 rounded-lg font-bold text-white shadow-lg ${isDecommissioning ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-500'}`}>
+                          {isDecommissioning ? 'Yes, Decommission' : 'Yes, Reactivate'}
+                      </button>
+                  </div>
+              </div>
+          </div>
+      );
+  };
+
   const CreateClientModal = () => {
     const [form, setForm] = useState({ 
         product: 'Agent', 
@@ -159,6 +210,7 @@ export const AppClientList: React.FC = () => {
            fileCount: 0,
            // If customized, add the selected customer immediately
            customers: form.accessType === 'Customized' && form.selectedCustomer ? [form.selectedCustomer] : [],
+           status: 'active',
            createdAt: new Date().toISOString().split('T')[0]
        };
        setClients([...clients, newClient]);
@@ -350,6 +402,7 @@ export const AppClientList: React.FC = () => {
                     </div>
                 </div>
 
+                {/* Footer */}
                 <div className="p-4 border-t border-inherit flex justify-end bg-opacity-50 bg-gray-500/5">
                     <button onClick={save} className={`px-6 py-2 rounded font-medium ${styles.buttonPrimary}`}>Save Changes</button>
                 </div>
@@ -372,6 +425,7 @@ export const AppClientList: React.FC = () => {
       
       {isCreateOpen && <CreateClientModal />}
       {isCustomerOpen && <CustomerBindingModal />}
+      {isStatusOpen && <StatusChangeModal />}
 
       {/* Header */}
       <div className={`p-6 rounded-lg border ${styles.card} flex flex-col md:flex-row justify-between items-center gap-6`}>
@@ -409,7 +463,8 @@ export const AppClientList: React.FC = () => {
               <table className="w-full text-left text-sm border-collapse">
                   <thead>
                       <tr className={styles.header}>
-                          <th className="p-4 font-semibold w-[300px]">Client Definition</th>
+                          <th className="p-4 font-semibold w-[250px]">Client Definition</th>
+                          <th className="p-4 font-semibold">Status</th>
                           <th className="p-4 font-semibold">Access Type</th>
                           <th className="p-4 font-semibold">Product Key</th>
                           <th className="p-4 font-semibold">Bound Customers</th>
@@ -420,8 +475,10 @@ export const AppClientList: React.FC = () => {
                       {clients.map(client => {
                           const Icon = getProductIcon(client.product);
                           const isPublic = client.accessType === 'Public';
+                          const isDecommissioned = client.status === 'decommissioned';
+
                           return (
-                            <tr key={client.id} className={styles.row}>
+                            <tr key={client.id} className={`${styles.row} ${isDecommissioned ? 'opacity-60 grayscale-[0.5]' : ''}`}>
                                 {/* Client Definition (Simplified) */}
                                 <td className="p-4 align-top">
                                     <div className="flex items-center gap-3">
@@ -446,6 +503,19 @@ export const AppClientList: React.FC = () => {
                                             </div>
                                         </div>
                                     </div>
+                                </td>
+
+                                {/* Status Column (New) */}
+                                <td className="p-4 align-top">
+                                    {isDecommissioned ? (
+                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-red-500/10 text-red-500 border border-red-500/20">
+                                            <Ban size={10} /> Decommissioned
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-green-500/10 text-green-500 border border-green-500/20">
+                                            <Activity size={10} /> Active
+                                        </span>
+                                    )}
                                 </td>
 
                                 {/* Access Type */}
@@ -478,8 +548,8 @@ export const AppClientList: React.FC = () => {
                                         </div>
                                     ) : (
                                         <div 
-                                            onClick={() => { setSelectedClient(client); setIsCustomerOpen(true); }}
-                                            className={`cursor-pointer group flex items-center gap-2`}
+                                            onClick={() => { if(!isDecommissioned) { setSelectedClient(client); setIsCustomerOpen(true); } }}
+                                            className={`group flex items-center gap-2 ${isDecommissioned ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
                                         >
                                             {client.customers.length === 0 ? (
                                                 <div className="flex items-center gap-1.5 text-xs text-red-500 font-medium bg-red-500/10 px-2 py-1 rounded border border-red-500/20 animate-pulse">
@@ -499,9 +569,11 @@ export const AppClientList: React.FC = () => {
                                                 </div>
                                             )}
                                             
-                                            <button className={`p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity ${styles.input} hover:bg-blue-500 hover:text-white ml-2`}>
-                                                <Users size={12} />
-                                            </button>
+                                            {!isDecommissioned && (
+                                                <button className={`p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity ${styles.input} hover:bg-blue-500 hover:text-white ml-2`}>
+                                                    <Users size={12} />
+                                                </button>
+                                            )}
                                         </div>
                                     )}
                                 </td>
@@ -509,20 +581,13 @@ export const AppClientList: React.FC = () => {
                                 {/* Actions */}
                                 <td className="p-4 align-top text-right">
                                     <div className="flex items-center justify-end gap-2">
-                                        {client.fileCount > 0 ? (
-                                            <div className="group relative">
-                                                    <button disabled className={`p-2 rounded cursor-not-allowed text-gray-500 opacity-50`}>
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                    <div className="absolute right-0 top-full mt-2 w-48 p-2 text-[10px] bg-black text-white rounded shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
-                                                        Cannot delete client with existing file versions ({client.fileCount}).
-                                                    </div>
-                                            </div>
-                                        ) : (
-                                            <button className={`p-2 rounded hover:bg-red-500/20 text-red-500 transition-colors`}>
-                                                <Trash2 size={16} />
-                                            </button>
-                                        )}
+                                        <button 
+                                            onClick={() => { setSelectedClient(client); setIsStatusOpen(true); }}
+                                            className={`p-2 rounded transition-colors ${isDecommissioned ? 'hover:bg-green-500/20 text-green-500' : 'hover:bg-red-500/20 text-red-500'}`}
+                                            title={isDecommissioned ? "Reactivate Client" : "Decommission Client"}
+                                        >
+                                            {isDecommissioned ? <RotateCcw size={16} /> : <Trash2 size={16} />}
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
