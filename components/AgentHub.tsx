@@ -249,6 +249,270 @@ const getArchsForConfig = (platform: string, series: string, isCustomSeries: boo
     return ['x86', 'x86_64'];
 };
 
+// Helper for Badges (Moved outside to be used by DetailEditModal)
+const Badge: React.FC<{ children: React.ReactNode, colorClass?: string, styles: any }> = ({ children, colorClass, styles }) => (
+    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${colorClass || styles.badge}`}>
+      {children}
+    </span>
+);
+
+// --- Stable Components (Moved Outside AgentHub) ---
+
+interface DetailEditModalProps {
+    packageData: ReleasePackage;
+    isOpen: boolean;
+    onClose: () => void;
+    onRefresh: () => void;
+    theme: AppTheme;
+    styles: any;
+}
+
+const DetailEditModal: React.FC<DetailEditModalProps> = ({ packageData, isOpen, onClose, onRefresh, theme, styles }) => {
+    if (!packageData || !isOpen) return null;
+    
+    // We can use Hooks here safely now
+    const [isEditing, setIsEditing] = useState(false);
+    const [activeTab, setActiveTab] = useState<'general' | 'compat' | 'activity'>('general');
+    const [editForm, setEditForm] = useState(packageData);
+    const [isPreviewMode, setIsPreviewMode] = useState(false); 
+    const [selectedDepId, setSelectedDepId] = useState('');
+
+    // Reset form when package changes
+    useEffect(() => {
+        setEditForm(packageData);
+        setIsEditing(false);
+        // Reset dep ID logic
+        if (!packageData.dependencies.isStandalone) {
+             const version = `${packageData.dependencies.major}.${packageData.dependencies.minor}.${packageData.dependencies.patch}`;
+             const found = MOCK_RELEASES.find(r => r.product === 'Agent' && r.platform === packageData.platform && r.version === version);
+             setSelectedDepId(found ? found.id : '');
+        } else {
+             setSelectedDepId('');
+        }
+    }, [packageData]);
+
+    const availableTargets = useMemo(() => {
+        return MOCK_TARGETS.filter(t => {
+            if (t.platform !== editForm.platform) return false;
+            const hasMatchingArch = t.arch.some(a => editForm.arch.includes(a as any));
+            if (!hasMatchingArch) return false;
+            return true;
+        });
+    }, [editForm.platform, editForm.arch]);
+
+    const availableDependencies = useMemo(() => {
+        return MOCK_RELEASES
+            .filter(r => r.product === 'Agent' && r.platform === editForm.platform)
+            .map(r => ({ id: r.id, label: `Agent v${r.version} (${r.series})` }));
+    }, [editForm.platform]);
+
+    const toggleOsSupport = (targetName: string) => {
+        setEditForm(prev => {
+            const exists = prev.supportOS.includes(targetName);
+            return {
+                ...prev,
+                supportOS: exists 
+                  ? prev.supportOS.filter(n => n !== targetName)
+                  : [...prev.supportOS, targetName]
+            };
+        });
+    };
+
+    const handleSave = () => {
+        let newDeps = { ...editForm.dependencies };
+        if (!newDeps.isStandalone && selectedDepId) {
+             const dep = MOCK_RELEASES.find(r => r.id === selectedDepId);
+             if (dep) {
+                 const [maj, min, pat] = dep.version.split('.');
+                 newDeps = { isStandalone: false, major: maj, minor: min, patch: pat };
+             }
+        } else if (newDeps.isStandalone) {
+             newDeps = { isStandalone: true, major: '', minor: '', patch: '' };
+        }
+
+        const newLog: ActivityLog = { id: `a-${Date.now()}`, user: 'current_admin', action: 'Updated package details', timestamp: new Date().toLocaleString() };
+        const index = MOCK_RELEASES.findIndex(r => r.id === packageData.id);
+        if (index !== -1) {
+            MOCK_RELEASES[index] = { 
+                ...editForm, 
+                dependencies: newDeps,
+                activityLog: [newLog, ...editForm.activityLog] 
+            };
+        }
+        setIsEditing(false);
+        onClose();
+        onRefresh();
+    };
+
+    return (
+      <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${styles.modalOverlay}`}>
+          <div className={`w-full max-w-4xl rounded-xl shadow-2xl border flex flex-col h-[80vh] ${styles.modalBg}`}>
+              <div className="p-6 border-b border-inherit flex justify-between items-start">
+                  <div className="flex items-start gap-4">
+                      <div className={`p-3 rounded-lg ${theme === AppTheme.LIGHT ? 'bg-blue-100 text-blue-600' : 'bg-blue-500/20 text-blue-400'}`}><Package size={24} /></div>
+                      <div>
+                          <div className="text-xs font-bold uppercase opacity-50 mb-1">Application Detail</div>
+                          <h2 className={`text-2xl font-bold ${styles.textMain} flex items-center gap-2`}>
+                              {editForm.filename}
+                              {editForm.status === 'decommissioned' ? (
+                                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-500 border border-red-500/20">Decommissioned</span>
+                              ) : editForm.targets.length > 0 ? (
+                                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 border border-green-500/20">Released</span>
+                              ) : (
+                                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-gray-500/20 text-gray-500 border border-gray-500/20">Not Released</span>
+                              )}
+                          </h2>
+                          <div className={`flex items-center gap-4 text-xs mt-1 ${styles.textSub}`}>
+                              <span className="flex items-center gap-1"><Clock size={12}/> Uploaded: {editForm.uploadedAt}</span>
+                          </div>
+                      </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                      {!isEditing ? (
+                          packageData.status !== 'decommissioned' && (
+                            <button onClick={() => setIsEditing(true)} className={`px-3 py-1.5 text-sm rounded-md border flex items-center gap-2 hover:bg-opacity-10 hover:bg-blue-500 transition-colors ${styles.textMain} border-inherit`}><Edit3 size={14} /> Edit Details</button>
+                          )
+                      ) : <div className="flex gap-2"><button onClick={() => { setIsEditing(false); setEditForm(packageData); }} className="px-3 py-1.5 text-sm rounded-md border border-red-500/30 text-red-500 hover:bg-red-500/10">Cancel</button><button onClick={handleSave} className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-2 ${styles.buttonPrimary}`}><Save size={14} /> Save Changes</button></div>}
+                      <button onClick={onClose} className={`p-2 hover:text-red-500 transition-colors ${styles.textSub}`}><X size={20} /></button>
+                  </div>
+              </div>
+              <div className={`flex px-6 border-b border-inherit gap-6 ${styles.textSub}`}><button onClick={() => setActiveTab('general')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'general' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>MANIFEST & Docs</button><button onClick={() => setActiveTab('compat')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'compat' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>Compatibility</button><button onClick={() => setActiveTab('activity')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'activity' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>File Activity</button></div>
+              <div className="flex-1 overflow-y-auto p-6 bg-opacity-50">
+                  {activeTab === 'general' && <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                      
+                      {/* Identity Card */}
+                      <div className={`p-5 rounded-lg border ${styles.input} bg-opacity-30`}>
+                          <h4 className={`text-xs font-bold uppercase mb-4 tracking-wider flex items-center gap-2 ${styles.textSub}`}>
+                              <Fingerprint size={14}/> Package Identity & Manifest
+                          </h4>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-y-6 gap-x-8 text-sm">
+                              <div>
+                                  <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Product</div>
+                                  <div className={`font-bold flex items-center gap-2 ${styles.textMain}`}>
+                                      {editForm.product === 'Agent' && <Monitor size={16} className="text-blue-500"/>}
+                                      {editForm.product === 'OTA Img' && <Layers size={16} className="text-purple-500"/>}
+                                      {editForm.product === 'Tool' && <Wrench size={16} className="text-orange-500"/>}
+                                      {editForm.product}
+                                  </div>
+                              </div>
+                              <div>
+                                  <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Platform</div>
+                                  <div className={`font-medium ${styles.textMain}`}>{editForm.platform}</div>
+                              </div>
+                              <div>
+                                  <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Series</div>
+                                  <div className={`font-medium ${styles.textMain}`}>{editForm.series}</div>
+                              </div>
+                              <div>
+                                  <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Architecture</div>
+                                  <div className={`font-mono text-xs px-2 py-1 rounded bg-black/20 w-fit ${styles.textMain}`}>{editForm.arch.join(', ')}</div>
+                              </div>
+                              
+                              <div>
+                                  <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Version</div>
+                                  <div className={`font-mono font-bold ${styles.textMain}`}>{editForm.version}</div>
+                              </div>
+                              <div>
+                                  <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Uploaded</div>
+                                  <div className={`font-mono ${styles.textMain}`}>{editForm.uploadedAt}</div>
+                              </div>
+                              <div>
+                                  <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Size</div>
+                                  <div className={`font-mono ${styles.textMain}`}>{editForm.size}</div>
+                              </div>
+                              <div className="col-span-2 md:col-span-4 pt-4 mt-2 border-t border-gray-500/20 grid grid-cols-2 gap-4">
+                                  <div>
+                                      <div className={`text-[10px] font-bold uppercase opacity-50 mb-1 ${styles.textSub}`}>Release Scope</div>
+                                      {editForm.scope === 'Generic' ? (
+                                          <div className="flex items-center gap-2 text-blue-500 font-medium">
+                                              <Globe size={16} /> 
+                                              <span>Generic Release</span>
+                                          </div>
+                                      ) : (
+                                          <div className="flex items-center gap-2 text-amber-500 font-medium">
+                                              <Lock size={16} /> 
+                                              <span>Customized: {editForm.customers?.join(', ')}</span>
+                                          </div>
+                                      )}
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+
+                      {/* Dependencies Editing Section */}
+                      <div className={`p-4 rounded border ${styles.input}`}>
+                          <div className="flex justify-between items-center mb-2">
+                              <label className={`text-xs font-bold uppercase ${styles.textSub}`}>Dependencies</label>
+                              {isEditing && (
+                                  <label className="flex items-center gap-2">
+                                      <input 
+                                          type="checkbox" 
+                                          checked={editForm.dependencies.isStandalone} 
+                                          onChange={e => setEditForm({...editForm, dependencies: {...editForm.dependencies, isStandalone: e.target.checked}})} 
+                                          className="rounded text-blue-600" 
+                                      />
+                                      <span className={`text-sm ${styles.textMain}`}>Standalone</span>
+                                  </label>
+                              )}
+                          </div>
+                          {isEditing ? (
+                              <div className={`relative ${editForm.dependencies.isStandalone ? 'opacity-30 pointer-events-none' : ''}`}>
+                                  <select 
+                                      value={selectedDepId} 
+                                      onChange={e => setSelectedDepId(e.target.value)} 
+                                      className={`w-full p-2 rounded border ${styles.inputGroup}`}
+                                  >
+                                      <option value="">Select Base Dependency...</option>
+                                      {availableDependencies.map(dep => (<option key={dep.id} value={dep.id}>{dep.label}</option>))}
+                                  </select>
+                              </div>
+                          ) : (
+                              <div>
+                                  {editForm.dependencies.isStandalone ? (
+                                      <Badge styles={styles} colorClass="bg-green-500/10 text-green-500 border border-green-500/20">Standalone</Badge>
+                                  ) : (
+                                      <div className="flex items-center gap-2">
+                                          <Badge styles={styles} colorClass="bg-amber-500/10 text-amber-500 border border-amber-500/20">Requires Agent</Badge>
+                                          <span className="font-mono text-sm">v{editForm.dependencies.major}.{editForm.dependencies.minor}.{editForm.dependencies.patch}</span>
+                                      </div>
+                                  )}
+                              </div>
+                          )}
+                      </div>
+
+                      <div className="space-y-2"><label className={`text-xs font-bold uppercase tracking-wider ${styles.textSub}`}>Description</label>{isEditing ? <input className={`w-full p-2 rounded border outline-none focus:ring-1 focus:ring-blue-500 ${styles.input}`} value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} /> : <p className={`${styles.textMain} text-sm`}>{editForm.description || <span className="opacity-50 italic">No description provided.</span>}</p>}</div>
+                      
+                      {/* Release Notes with Markdown Toggle */}
+                      <div className="space-y-2">
+                          <div className="flex justify-between items-center">
+                              <label className={`text-xs font-bold uppercase tracking-wider ${styles.textSub}`}>Release Notes</label>
+                              {isEditing && (
+                                <div className="flex gap-1">
+                                    <button onClick={() => setIsPreviewMode(false)} className={`px-2 py-0.5 text-[10px] rounded-l border ${!isPreviewMode ? 'bg-blue-500 text-white' : styles.input}`}>Write</button>
+                                    <button onClick={() => setIsPreviewMode(true)} className={`px-2 py-0.5 text-[10px] rounded-r border ${isPreviewMode ? 'bg-blue-500 text-white' : styles.input}`}>Preview</button>
+                                </div>
+                              )}
+                          </div>
+                          {isEditing ? (
+                              isPreviewMode ? (
+                                  <div className={`w-full h-48 p-4 rounded border overflow-y-auto font-mono text-sm ${styles.input} bg-opacity-50`}>
+                                      {editForm.releaseNotes || <span className="opacity-50 italic">No content.</span>}
+                                  </div>
+                              ) : (
+                                  <textarea className={`w-full h-48 p-4 rounded border outline-none focus:ring-1 focus:ring-blue-500 font-mono text-sm ${styles.input}`} value={editForm.releaseNotes} onChange={e => setEditForm({...editForm, releaseNotes: e.target.value})} /> 
+                              )
+                          ) : (
+                              <div className={`w-full p-4 rounded border font-mono text-sm whitespace-pre-wrap ${styles.input} bg-opacity-50`}>{editForm.releaseNotes || <span className="opacity-50 italic">No notes available.</span>}</div>
+                          )}
+                      </div>
+                  </div>}
+                  {activeTab === 'compat' && <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 h-full flex flex-col"><div className="flex justify-between items-center"><h3 className={`font-bold ${styles.textMain}`}>Supported OS Targets</h3><div className={`text-xs ${styles.textSub}`}>{editForm.supportOS.length} targets selected</div></div>{isEditing ? <div className={`flex-1 overflow-y-auto border rounded-md p-2 ${styles.input}`}><div className="grid grid-cols-1 md:grid-cols-2 gap-2">{availableTargets.map(t => { const isSelected = editForm.supportOS.includes(t.name); return (<div key={t.id} onClick={() => toggleOsSupport(t.name)} className={`p-3 rounded border cursor-pointer flex items-center gap-3 select-none transition-colors ${isSelected ? 'bg-blue-500/10 border-blue-500 ring-1 ring-blue-500/50' : 'border-transparent hover:bg-gray-500/10'}`}><div className={`w-4 h-4 rounded border flex items-center justify-center ${isSelected ? 'bg-blue-500 border-blue-500 text-white' : 'border-gray-500'}`}>{isSelected && <Check size={10} />}</div><div><div className={`text-sm font-medium ${styles.textMain}`}>{t.name}</div><div className="text-xs opacity-50 font-mono">{t.code}</div></div></div>); })}</div></div> : <div className={`flex-1 overflow-y-auto border rounded-md ${styles.input}`}>{editForm.supportOS.length > 0 ? (<table className="w-full text-left text-sm"><thead className="bg-black/10"><tr><th className="p-3 font-semibold text-xs uppercase opacity-70">Target Name</th><th className="p-3 font-semibold text-xs uppercase opacity-70">Status</th></tr></thead><tbody>{editForm.supportOS.map((os, i) => (<tr key={i} className="border-b border-inherit last:border-0 hover:bg-white/5"><td className="p-3 font-medium flex items-center gap-2"><Monitor size={14} className="opacity-50"/> {os}</td><td className="p-3"><span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 border border-green-500/20">Verified</span></td></tr>))}</tbody></table>) : <div className="p-8 text-center opacity-50"><AlertTriangle size={24} className="mx-auto mb-2"/><p>No OS targets specified.</p></div>}</div>}</div>}
+                  {activeTab === 'activity' && <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2"><div className="relative pl-4 space-y-6"><div className="absolute left-0 top-2 bottom-2 w-0.5 bg-gray-500/20"></div>{editForm.activityLog && editForm.activityLog.length > 0 ? editForm.activityLog.map((log, index) => (<div key={log.id} className="relative pl-6"><div className={`absolute left-[-5px] top-1 w-2.5 h-2.5 rounded-full border-2 ${theme === AppTheme.LIGHT ? 'bg-white border-blue-500' : 'bg-slate-800 border-blue-400'} z-10`}></div><div className="flex flex-col"><span className={`text-sm font-medium ${styles.textMain}`}>{log.action}</span><div className="flex items-center gap-2 text-xs opacity-60 mt-1"><span className="flex items-center gap-1"><User size={10}/> {log.user}</span><span>•</span><span className="flex items-center gap-1"><Calendar size={10}/> {log.timestamp}</span></div></div></div>)) : <p className="text-sm opacity-50 italic pl-6">No activity recorded.</p>}</div></div>}
+              </div>
+          </div>
+      </div>
+    );
+};
 
 export const AgentHub: React.FC = () => {
   const { theme } = useApp();
@@ -330,13 +594,6 @@ export const AgentHub: React.FC = () => {
   };
 
   const styles = getStyles();
-
-  // Helper for Badges
-  const Badge: React.FC<{ children: React.ReactNode, colorClass?: string }> = ({ children, colorClass }) => (
-    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${colorClass || styles.badge}`}>
-      {children}
-    </span>
-  );
 
   // Searchable Select Component for large customer lists
   const SearchableSelect: React.FC<{
@@ -498,193 +755,7 @@ export const AgentHub: React.FC = () => {
     );
   };
 
-  const DetailEditModal = () => {
-    if (!selectedPackage) return null;
-    const [isEditing, setIsEditing] = useState(false);
-    const [activeTab, setActiveTab] = useState<'general' | 'compat' | 'activity'>('general');
-    const [editForm, setEditForm] = useState(selectedPackage);
-    const [isPreviewMode, setIsPreviewMode] = useState(false); // Markdown Preview State
-
-    // Find existing dependency ID logic
-    const findDependencyId = (platform: string, major: string, minor: string, patch: string) => {
-        const version = `${major}.${minor}.${patch}`;
-        const found = MOCK_RELEASES.find(r => r.product === 'Agent' && r.platform === platform && r.version === version);
-        return found ? found.id : '';
-    };
-
-    const [selectedDepId, setSelectedDepId] = useState(() => {
-        if (selectedPackage.dependencies.isStandalone) return '';
-        return findDependencyId(selectedPackage.platform, selectedPackage.dependencies.major, selectedPackage.dependencies.minor, selectedPackage.dependencies.patch);
-    });
-
-    const availableTargets = useMemo(() => {
-        return MOCK_TARGETS.filter(t => {
-            if (t.platform !== editForm.platform) return false;
-            const hasMatchingArch = t.arch.some(a => editForm.arch.includes(a as any));
-            if (!hasMatchingArch) return false;
-            return true;
-        });
-    }, [editForm.platform, editForm.arch]);
-
-    const availableDependencies = useMemo(() => {
-        return MOCK_RELEASES
-            .filter(r => r.product === 'Agent' && r.platform === editForm.platform) // Agent on same platform
-            .map(r => ({ id: r.id, label: `Agent v${r.version} (${r.series})` }));
-    }, [editForm.platform]);
-
-    const toggleOsSupport = (targetName: string) => {
-        setEditForm(prev => {
-            const exists = prev.supportOS.includes(targetName);
-            return {
-                ...prev,
-                supportOS: exists 
-                  ? prev.supportOS.filter(n => n !== targetName)
-                  : [...prev.supportOS, targetName]
-            };
-        });
-    };
-
-    const handleSave = () => {
-        // Update dependencies structure based on selection
-        let newDeps = { ...editForm.dependencies };
-        if (!newDeps.isStandalone && selectedDepId) {
-             const dep = MOCK_RELEASES.find(r => r.id === selectedDepId);
-             if (dep) {
-                 const [maj, min, pat] = dep.version.split('.');
-                 newDeps = { isStandalone: false, major: maj, minor: min, patch: pat };
-             }
-        } else if (newDeps.isStandalone) {
-             newDeps = { isStandalone: true, major: '', minor: '', patch: '' };
-        }
-
-        const newLog: ActivityLog = { id: `a-${Date.now()}`, user: 'current_admin', action: 'Updated package details', timestamp: new Date().toLocaleString() };
-        const index = MOCK_RELEASES.findIndex(r => r.id === selectedPackage.id);
-        if (index !== -1) {
-            MOCK_RELEASES[index] = { 
-                ...editForm, 
-                dependencies: newDeps,
-                activityLog: [newLog, ...editForm.activityLog] 
-            };
-        }
-        setIsEditing(false);
-        setIsDetailOpen(false);
-        handleRefresh();
-    };
-
-    return (
-      <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${styles.modalOverlay}`}>
-          <div className={`w-full max-w-4xl rounded-xl shadow-2xl border flex flex-col h-[80vh] ${styles.modalBg}`}>
-              <div className="p-6 border-b border-inherit flex justify-between items-start">
-                  <div className="flex items-start gap-4">
-                      <div className={`p-3 rounded-lg ${theme === AppTheme.LIGHT ? 'bg-blue-100 text-blue-600' : 'bg-blue-500/20 text-blue-400'}`}><Package size={24} /></div>
-                      <div>
-                          <div className="text-xs font-bold uppercase opacity-50 mb-1">Application Detail</div>
-                          <h2 className={`text-xl font-bold ${styles.textMain} flex items-center gap-2`}>
-                              {editForm.filename}
-                              {editForm.status === 'decommissioned' ? (
-                                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-500 border border-red-500/20">Decommissioned</span>
-                              ) : editForm.targets.length > 0 ? (
-                                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 border border-green-500/20">Released</span>
-                              ) : (
-                                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-gray-500/20 text-gray-500 border border-gray-500/20">Not Released</span>
-                              )}
-                          </h2>
-                          <div className={`flex items-center gap-4 text-xs mt-1 ${styles.textSub}`}>
-                              <span className="flex items-center gap-1"><Monitor size={12}/> {editForm.product} • {editForm.platform} • {editForm.series}</span>
-                              <span className="flex items-center gap-1"><Cpu size={12}/> {editForm.arch.join(', ')}</span>
-                              <span className="flex items-center gap-1"><Clock size={12}/> {editForm.uploadedAt}</span>
-                          </div>
-                      </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                      {!isEditing ? (
-                          selectedPackage.status !== 'decommissioned' && (
-                            <button onClick={() => setIsEditing(true)} className={`px-3 py-1.5 text-sm rounded-md border flex items-center gap-2 hover:bg-opacity-10 hover:bg-blue-500 transition-colors ${styles.textMain} border-inherit`}><Edit3 size={14} /> Edit Details</button>
-                          )
-                      ) : <div className="flex gap-2"><button onClick={() => { setIsEditing(false); setEditForm(selectedPackage); }} className="px-3 py-1.5 text-sm rounded-md border border-red-500/30 text-red-500 hover:bg-red-500/10">Cancel</button><button onClick={handleSave} className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-2 ${styles.buttonPrimary}`}><Save size={14} /> Save Changes</button></div>}
-                      <button onClick={() => setIsDetailOpen(false)} className={`p-2 hover:text-red-500 transition-colors ${styles.textSub}`}><X size={20} /></button>
-                  </div>
-              </div>
-              <div className={`flex px-6 border-b border-inherit gap-6 ${styles.textSub}`}><button onClick={() => setActiveTab('general')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'general' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>MANIFEST & Docs</button><button onClick={() => setActiveTab('compat')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'compat' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>Compatibility</button><button onClick={() => setActiveTab('activity')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'activity' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>File Activity</button></div>
-              <div className="flex-1 overflow-y-auto p-6 bg-opacity-50">
-                  {activeTab === 'general' && <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-                      {/* Removed Release Configuration as requested */}
-
-                      {/* Dependencies Editing Section */}
-                      <div className={`p-4 rounded border ${styles.input}`}>
-                          <div className="flex justify-between items-center mb-2">
-                              <label className={`text-xs font-bold uppercase ${styles.textSub}`}>Dependencies</label>
-                              {isEditing && (
-                                  <label className="flex items-center gap-2">
-                                      <input 
-                                          type="checkbox" 
-                                          checked={editForm.dependencies.isStandalone} 
-                                          onChange={e => setEditForm({...editForm, dependencies: {...editForm.dependencies, isStandalone: e.target.checked}})} 
-                                          className="rounded text-blue-600" 
-                                      />
-                                      <span className={`text-sm ${styles.textMain}`}>Standalone</span>
-                                  </label>
-                              )}
-                          </div>
-                          {isEditing ? (
-                              <div className={`relative ${editForm.dependencies.isStandalone ? 'opacity-30 pointer-events-none' : ''}`}>
-                                  <select 
-                                      value={selectedDepId} 
-                                      onChange={e => setSelectedDepId(e.target.value)} 
-                                      className={`w-full p-2 rounded border ${styles.inputGroup}`}
-                                  >
-                                      <option value="">Select Base Dependency...</option>
-                                      {availableDependencies.map(dep => (<option key={dep.id} value={dep.id}>{dep.label}</option>))}
-                                  </select>
-                              </div>
-                          ) : (
-                              <div>
-                                  {editForm.dependencies.isStandalone ? (
-                                      <Badge colorClass="bg-green-500/10 text-green-500 border border-green-500/20">Standalone</Badge>
-                                  ) : (
-                                      <div className="flex items-center gap-2">
-                                          <Badge colorClass="bg-amber-500/10 text-amber-500 border border-amber-500/20">Requires Agent</Badge>
-                                          <span className="font-mono text-sm">v{editForm.dependencies.major}.{editForm.dependencies.minor}.{editForm.dependencies.patch}</span>
-                                      </div>
-                                  )}
-                              </div>
-                          )}
-                      </div>
-
-                      <div className="space-y-2"><label className={`text-xs font-bold uppercase tracking-wider ${styles.textSub}`}>Description</label>{isEditing ? <input className={`w-full p-2 rounded border outline-none focus:ring-1 focus:ring-blue-500 ${styles.input}`} value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} /> : <p className={`${styles.textMain} text-sm`}>{editForm.description || <span className="opacity-50 italic">No description provided.</span>}</p>}</div>
-                      
-                      {/* Release Notes with Markdown Toggle */}
-                      <div className="space-y-2">
-                          <div className="flex justify-between items-center">
-                              <label className={`text-xs font-bold uppercase tracking-wider ${styles.textSub}`}>Release Notes</label>
-                              {isEditing && (
-                                <div className="flex gap-1">
-                                    <button onClick={() => setIsPreviewMode(false)} className={`px-2 py-0.5 text-[10px] rounded-l border ${!isPreviewMode ? 'bg-blue-500 text-white' : styles.input}`}>Write</button>
-                                    <button onClick={() => setIsPreviewMode(true)} className={`px-2 py-0.5 text-[10px] rounded-r border ${isPreviewMode ? 'bg-blue-500 text-white' : styles.input}`}>Preview</button>
-                                </div>
-                              )}
-                          </div>
-                          {isEditing ? (
-                              isPreviewMode ? (
-                                  <div className={`w-full h-48 p-4 rounded border overflow-y-auto font-mono text-sm ${styles.input} bg-opacity-50`}>
-                                      {editForm.releaseNotes || <span className="opacity-50 italic">No content.</span>}
-                                  </div>
-                              ) : (
-                                  <textarea className={`w-full h-48 p-4 rounded border outline-none focus:ring-1 focus:ring-blue-500 font-mono text-sm ${styles.input}`} value={editForm.releaseNotes} onChange={e => setEditForm({...editForm, releaseNotes: e.target.value})} /> 
-                              )
-                          ) : (
-                              <div className={`w-full p-4 rounded border font-mono text-sm whitespace-pre-wrap ${styles.input} bg-opacity-50`}>{editForm.releaseNotes || <span className="opacity-50 italic">No notes available.</span>}</div>
-                          )}
-                      </div>
-                  </div>}
-                  {activeTab === 'compat' && <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 h-full flex flex-col"><div className="flex justify-between items-center"><h3 className={`font-bold ${styles.textMain}`}>Supported OS Targets</h3><div className={`text-xs ${styles.textSub}`}>{editForm.supportOS.length} targets selected</div></div>{isEditing ? <div className={`flex-1 overflow-y-auto border rounded-md p-2 ${styles.input}`}><div className="grid grid-cols-1 md:grid-cols-2 gap-2">{availableTargets.map(t => { const isSelected = editForm.supportOS.includes(t.name); return (<div key={t.id} onClick={() => toggleOsSupport(t.name)} className={`p-3 rounded border cursor-pointer flex items-center gap-3 select-none transition-colors ${isSelected ? 'bg-blue-500/10 border-blue-500 ring-1 ring-blue-500/50' : 'border-transparent hover:bg-gray-500/10'}`}><div className={`w-4 h-4 rounded border flex items-center justify-center ${isSelected ? 'bg-blue-500 border-blue-500 text-white' : 'border-gray-500'}`}>{isSelected && <Check size={10} />}</div><div><div className={`text-sm font-medium ${styles.textMain}`}>{t.name}</div><div className="text-xs opacity-50 font-mono">{t.code}</div></div></div>); })}</div></div> : <div className={`flex-1 overflow-y-auto border rounded-md ${styles.input}`}>{editForm.supportOS.length > 0 ? (<table className="w-full text-left text-sm"><thead className="bg-black/10"><tr><th className="p-3 font-semibold text-xs uppercase opacity-70">Target Name</th><th className="p-3 font-semibold text-xs uppercase opacity-70">Status</th></tr></thead><tbody>{editForm.supportOS.map((os, i) => (<tr key={i} className="border-b border-inherit last:border-0 hover:bg-white/5"><td className="p-3 font-medium flex items-center gap-2"><Monitor size={14} className="opacity-50"/> {os}</td><td className="p-3"><span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 border border-green-500/20">Verified</span></td></tr>))}</tbody></table>) : <div className="p-8 text-center opacity-50"><AlertTriangle size={24} className="mx-auto mb-2"/><p>No OS targets specified.</p></div>}</div>}</div>}
-                  {activeTab === 'activity' && <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2"><div className="relative pl-4 space-y-6"><div className="absolute left-0 top-2 bottom-2 w-0.5 bg-gray-500/20"></div>{editForm.activityLog && editForm.activityLog.length > 0 ? editForm.activityLog.map((log, index) => (<div key={log.id} className="relative pl-6"><div className={`absolute left-[-5px] top-1 w-2.5 h-2.5 rounded-full border-2 ${theme === AppTheme.LIGHT ? 'bg-white border-blue-500' : 'bg-slate-800 border-blue-400'} z-10`}></div><div className="flex flex-col"><span className={`text-sm font-medium ${styles.textMain}`}>{log.action}</span><div className="flex items-center gap-2 text-xs opacity-60 mt-1"><span className="flex items-center gap-1"><User size={10}/> {log.user}</span><span>•</span><span className="flex items-center gap-1"><Calendar size={10}/> {log.timestamp}</span></div></div></div>)) : <p className="text-sm opacity-50 italic pl-6">No activity recorded.</p>}</div></div>}
-              </div>
-          </div>
-      </div>
-    );
-  };
-
+  // --- DETAIL EDIT MODAL REMOVED FROM HERE AND MOVED UP FOR STABILITY ---
 
   // --- WIZARD COMPONENT ---
   const UploadWizard = () => {
@@ -1040,8 +1111,8 @@ export const AgentHub: React.FC = () => {
                             <div className="grid grid-cols-2 gap-4 border-t border-dashed border-gray-400/20 pt-4">
                                 <div><div className={`text-[10px] font-bold uppercase opacity-50 mb-1`}>PLATFORM</div><div className="font-medium text-sm">{formData.platform}</div></div>
                                 <div><div className={`text-[10px] font-bold uppercase opacity-50 mb-1`}>SERIES</div><div className="font-medium text-sm">{currentSeries}</div></div>
-                                <div><div className={`text-[10px] font-bold uppercase opacity-50 mb-1`}>ARCHITECTURE</div><Badge colorClass="bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">{formData.arch}</Badge></div>
-                                <div><div className={`text-[10px] font-bold uppercase opacity-50 mb-1`}>DEPENDENCIES</div><Badge colorClass={formData.isStandalone ? "bg-green-500/10 text-green-500 border border-green-500/20" : "bg-amber-500/10 text-amber-500 border border-amber-500/20"}>{formData.isStandalone ? 'Standalone' : 'Standard'}</Badge></div>
+                                <div><div className={`text-[10px] font-bold uppercase opacity-50 mb-1`}>ARCHITECTURE</div><Badge styles={styles} colorClass="bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">{formData.arch}</Badge></div>
+                                <div><div className={`text-[10px] font-bold uppercase opacity-50 mb-1`}>DEPENDENCIES</div><Badge styles={styles} colorClass={formData.isStandalone ? "bg-green-500/10 text-green-500 border border-green-500/20" : "bg-amber-500/10 text-amber-500 border border-amber-500/20"}>{formData.isStandalone ? 'Standalone' : 'Standard'}</Badge></div>
                             </div>
                         </div>
                     </div>
@@ -1723,7 +1794,16 @@ export const AgentHub: React.FC = () => {
       
       {isUploadOpen && <UploadWizard />}
       {isReleaseOpen && <ReleaseModal />}
-      {isDetailOpen && <DetailEditModal />}
+      {isDetailOpen && selectedPackage && (
+          <DetailEditModal 
+             packageData={selectedPackage} 
+             isOpen={isDetailOpen} 
+             onClose={() => setIsDetailOpen(false)} 
+             onRefresh={handleRefresh}
+             theme={theme}
+             styles={styles}
+          />
+      )}
       {isStatusOpen && <StatusManagementModal />}
 
       {/* Header Banner */}
@@ -1914,7 +1994,7 @@ export const AgentHub: React.FC = () => {
                                   {!isDecommissioned && isReleased ? (
                                       <div className="flex flex-wrap gap-1 max-w-[120px]">
                                           {item.channels.length > 0 ? item.channels.map(c => (
-                                              <Badge key={c} colorClass="bg-blue-500/20 text-blue-400 border border-blue-500/30">{c}</Badge>
+                                              <Badge key={c} styles={styles} colorClass="bg-blue-500/20 text-blue-400 border border-blue-500/30">{c}</Badge>
                                           )) : (
                                               <span className="text-[10px] opacity-50 italic">No Active Channels</span>
                                           )}
