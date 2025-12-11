@@ -146,7 +146,8 @@ export const AppClientList: React.FC = () => {
         platform: 'Android', 
         series: '', 
         arch: 'x86_64',
-        accessType: 'Customized' as 'Public' | 'Customized' 
+        accessType: 'Public' as 'Public' | 'Customized',
+        selectedCustomer: '' 
     });
 
     const handleSubmit = () => {
@@ -156,12 +157,15 @@ export const AppClientList: React.FC = () => {
            platform: form.platform as any,
            productKey: `${form.product.toUpperCase().slice(0,3)}-${Math.floor(Math.random()*10000)}-${form.platform.toUpperCase().slice(0,1)}`,
            fileCount: 0,
-           customers: [],
+           // If customized, add the selected customer immediately
+           customers: form.accessType === 'Customized' && form.selectedCustomer ? [form.selectedCustomer] : [],
            createdAt: new Date().toISOString().split('T')[0]
        };
        setClients([...clients, newClient]);
        setIsCreateOpen(false);
     };
+
+    const isSubmitDisabled = form.accessType === 'Customized' && !form.selectedCustomer;
 
     return (
         <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${styles.modalOverlay}`}>
@@ -170,61 +174,87 @@ export const AppClientList: React.FC = () => {
                     <h3 className={`text-lg font-bold ${styles.textMain}`}>Create App Client</h3>
                     <button onClick={() => setIsCreateOpen(false)}><X size={20} className={styles.textSub}/></button>
                 </div>
-                <div className="space-y-4">
-                    {/* Row 1: Product & Type */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className={`block text-xs uppercase font-bold mb-1 ${styles.textSub}`}>Product</label>
-                            <select className={`w-full p-2 rounded border ${styles.input}`} value={form.product} onChange={e => setForm({...form, product: e.target.value})}>
-                                <option>Agent</option><option>OTA Img</option><option>Tool</option>
-                            </select>
+                <div className="space-y-5">
+                    
+                    {/* Access Scope Section */}
+                    <div className={`p-4 rounded-lg border ${styles.input} space-y-3`}>
+                        <div className="flex justify-between items-center">
+                            <label className={`text-xs uppercase font-bold ${styles.textSub}`}>Access Type</label>
+                            {form.accessType === 'Public' ? <Globe size={14} className="text-blue-500"/> : <Lock size={14} className="text-amber-500"/>}
                         </div>
-                        <div>
-                            <label className={`block text-xs uppercase font-bold mb-1 ${styles.textSub}`}>Access Type</label>
-                            <select className={`w-full p-2 rounded border ${styles.input}`} value={form.accessType} onChange={e => setForm({...form, accessType: e.target.value as any})}>
-                                <option value="Customized">Customized</option>
-                                <option value="Public">Public</option>
-                            </select>
-                        </div>
+                        <select className={`w-full p-2 rounded border ${styles.input}`} value={form.accessType} onChange={e => setForm({...form, accessType: e.target.value as any})}>
+                            <option value="Public">Public (Global Access)</option>
+                            <option value="Customized">Customized (Private)</option>
+                        </select>
+
+                        {form.accessType === 'Customized' && (
+                            <div className="animate-in fade-in slide-in-from-top-1 pt-2 border-t border-dashed border-gray-500/20">
+                                <label className={`block text-xs uppercase font-bold mb-1 ${styles.textSub}`}>Target Customer</label>
+                                <select 
+                                    className={`w-full p-2 rounded border ${styles.input} ${!form.selectedCustomer ? 'border-amber-500/50 ring-1 ring-amber-500/20' : ''}`} 
+                                    value={form.selectedCustomer} 
+                                    onChange={e => setForm({...form, selectedCustomer: e.target.value})}
+                                >
+                                    <option value="">Select a Customer...</option>
+                                    {MOCK_EXISTING_CUSTOMERS.map(c => (
+                                        <option key={c} value={c}>{c}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
                     </div>
 
-                    {/* Row 2: Platform & Arch */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className={`block text-xs uppercase font-bold mb-1 ${styles.textSub}`}>Platform</label>
-                            <select className={`w-full p-2 rounded border ${styles.input}`} value={form.platform} onChange={e => setForm({...form, platform: e.target.value})}>
-                                <option>Android</option><option>Windows</option><option>Linux</option>
-                            </select>
+                    {/* Client Definition */}
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className={`block text-xs uppercase font-bold mb-1 ${styles.textSub}`}>Product</label>
+                                <select className={`w-full p-2 rounded border ${styles.input}`} value={form.product} onChange={e => setForm({...form, product: e.target.value})}>
+                                    <option>Agent</option><option>OTA Img</option><option>Tool</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className={`block text-xs uppercase font-bold mb-1 ${styles.textSub}`}>Platform</label>
+                                <select className={`w-full p-2 rounded border ${styles.input}`} value={form.platform} onChange={e => setForm({...form, platform: e.target.value})}>
+                                    <option>Android</option><option>Windows</option><option>Linux</option>
+                                </select>
+                            </div>
                         </div>
-                        <div>
-                            <label className={`block text-xs uppercase font-bold mb-1 ${styles.textSub}`}>Architecture</label>
-                            <select className={`w-full p-2 rounded border ${styles.input}`} value={form.arch} onChange={e => setForm({...form, arch: e.target.value})}>
-                                <option>x86_64</option><option>x86</option><option>arm64</option><option>arm</option>
-                            </select>
-                        </div>
-                    </div>
 
-                    {/* Row 3: Series */}
-                    <div>
-                        <label className={`block text-xs uppercase font-bold mb-1 ${styles.textSub}`}>Series</label>
-                        <input type="text" placeholder="e.g. FT-GMS" className={`w-full p-2 rounded border outline-none focus:ring-1 focus:ring-blue-500 ${styles.input}`} value={form.series} onChange={e => setForm({...form, series: e.target.value})} />
-                        <p className={`text-[10px] mt-1 ${styles.textSub}`}>Unique identifier for this variant line.</p>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className={`block text-xs uppercase font-bold mb-1 ${styles.textSub}`}>Architecture</label>
+                                <select className={`w-full p-2 rounded border ${styles.input}`} value={form.arch} onChange={e => setForm({...form, arch: e.target.value})}>
+                                    <option>x86_64</option><option>x86</option><option>arm64</option><option>arm</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className={`block text-xs uppercase font-bold mb-1 ${styles.textSub}`}>Series</label>
+                                <input type="text" placeholder="e.g. FT-GMS" className={`w-full p-2 rounded border outline-none focus:ring-1 focus:ring-blue-500 ${styles.input}`} value={form.series} onChange={e => setForm({...form, series: e.target.value})} />
+                            </div>
+                        </div>
                     </div>
 
                     {/* Info Box */}
                     {form.accessType === 'Public' ? (
                         <div className="p-3 bg-blue-500/10 text-blue-500 text-xs rounded border border-blue-500/20 flex gap-2">
-                             <Globe size={16} />
-                             <span>Public clients are accessible to all customers. No specific binding required.</span>
+                             <Globe size={16} className="shrink-0" />
+                             <span>Public clients are accessible to all customers. No binding required.</span>
                         </div>
                     ) : (
                         <div className="p-3 bg-amber-500/10 text-amber-500 text-xs rounded border border-amber-500/20 flex gap-2">
-                             <Lock size={16} />
-                             <span>Customized clients must be bound to specific customers after creation.</span>
+                             <Lock size={16} className="shrink-0" />
+                             <span>Restricted to the selected customer only.</span>
                         </div>
                     )}
 
-                    <button onClick={handleSubmit} className={`w-full py-2 rounded font-bold mt-4 ${styles.buttonPrimary}`}>Create Client</button>
+                    <button 
+                        onClick={handleSubmit} 
+                        disabled={isSubmitDisabled}
+                        className={`w-full py-2 rounded font-bold mt-4 ${isSubmitDisabled ? 'bg-gray-500 cursor-not-allowed opacity-50 text-white' : styles.buttonPrimary}`}
+                    >
+                        Create Client
+                    </button>
                 </div>
             </div>
         </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useApp } from '../contexts/AppContext';
 import { AppTheme } from '../types';
 import { 
@@ -52,7 +52,9 @@ import {
   Building2,
   Lock,
   FileCode,
-  HelpCircle
+  HelpCircle,
+  ChevronDown,
+  Fingerprint
 } from 'lucide-react';
 
 // --- Types ---
@@ -183,7 +185,15 @@ const MOCK_CUSTOMERS = [
     'RetailCorp', 
     'FastFood Chain A', 
     'Bank of Innovation', 
-    'Gov Dept'
+    'Gov Dept',
+    'TechGiant Inc', 
+    'Logistics Co', 
+    'Healthcare Plus', 
+    'EduSystem K12', 
+    'Smart City Grid', 
+    'Transport Authority', 
+    'Global Shipping', 
+    'Energy Provider X'
 ];
 
 const CHANNEL_DESCRIPTIONS: Record<ReleaseChannel, string> = {
@@ -318,18 +328,83 @@ export const AgentHub: React.FC = () => {
     </span>
   );
 
+  // Searchable Select Component for large customer lists
+  const SearchableSelect: React.FC<{
+      options: string[];
+      value: string;
+      onChange: (val: string) => void;
+      placeholder?: string;
+  }> = ({ options, value, onChange, placeholder = "Select..." }) => {
+      const [isOpen, setIsOpen] = useState(false);
+      const [search, setSearch] = useState('');
+      const wrapperRef = useRef<HTMLDivElement>(null);
+
+      const filteredOptions = options.filter(opt => opt.toLowerCase().includes(search.toLowerCase()));
+
+      useEffect(() => {
+          function handleClickOutside(event: MouseEvent) {
+              if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+                  setIsOpen(false);
+              }
+          }
+          document.addEventListener("mousedown", handleClickOutside);
+          return () => document.removeEventListener("mousedown", handleClickOutside);
+      }, []);
+
+      return (
+          <div ref={wrapperRef} className="relative w-full">
+              <div 
+                  onClick={() => setIsOpen(!isOpen)} 
+                  className={`w-full p-4 rounded-lg border text-lg flex justify-between items-center cursor-pointer ${styles.input} ${!value ? 'opacity-70' : ''}`}
+              >
+                  <span>{value || placeholder}</span>
+                  <ChevronDown size={20} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+              </div>
+              
+              {isOpen && (
+                  <div className={`absolute top-full left-0 w-full mt-2 rounded-lg border shadow-xl max-h-60 overflow-hidden flex flex-col z-50 ${theme === AppTheme.LIGHT ? 'bg-white border-blue-200' : 'bg-[#21222c] border-[#44475a]'}`}>
+                      <div className="p-2 border-b border-inherit">
+                          <div className="relative">
+                              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 opacity-50" />
+                              <input 
+                                  autoFocus
+                                  type="text" 
+                                  placeholder="Filter customers..." 
+                                  className={`w-full pl-9 p-2 rounded text-sm bg-transparent border border-transparent focus:border-blue-500 focus:outline-none ${styles.textMain}`}
+                                  value={search}
+                                  onChange={(e) => setSearch(e.target.value)}
+                              />
+                          </div>
+                      </div>
+                      <div className="flex-1 overflow-y-auto p-1 custom-scrollbar">
+                          {filteredOptions.length > 0 ? filteredOptions.map(opt => (
+                              <div 
+                                  key={opt} 
+                                  onClick={() => { onChange(opt); setIsOpen(false); setSearch(''); }}
+                                  className={`px-4 py-2.5 rounded cursor-pointer text-sm hover:bg-blue-500 hover:text-white transition-colors ${value === opt ? 'bg-blue-500/10 text-blue-500 font-bold' : styles.textMain}`}
+                              >
+                                  {opt}
+                              </div>
+                          )) : (
+                              <div className="p-4 text-center text-sm opacity-50">No results found.</div>
+                          )}
+                      </div>
+                  </div>
+              )}
+          </div>
+      );
+  };
+
   // ... (StatusManagementModal and DetailEditModal kept as is) ...
   const StatusManagementModal = () => {
     if (!selectedPackage) return null;
-    const [confirmAction, setConfirmAction] = useState<'revert' | 'deprecate' | 'delete' | null>(null);
+    const [confirmAction, setConfirmAction] = useState<'revert' | 'deprecate' | null>(null);
 
     const executeAction = () => {
         if (!confirmAction) return;
         const idx = MOCK_RELEASES.findIndex(r => r.id === selectedPackage.id);
         if (idx !== -1) {
-            if (confirmAction === 'delete') {
-                MOCK_RELEASES.splice(idx, 1);
-            } else if (confirmAction === 'deprecate') {
+            if (confirmAction === 'deprecate') {
                 MOCK_RELEASES[idx].status = 'deprecated';
             } else if (confirmAction === 'revert') {
                 MOCK_RELEASES[idx].status = 'active';
@@ -344,8 +419,7 @@ export const AgentHub: React.FC = () => {
     const getConfirmConfig = () => {
         switch(confirmAction) {
             case 'revert': return { icon: RotateCcw, color: 'text-gray-400', title: 'Revert to Not Released', desc: 'This will remove the package from all channels and targets. It will no longer be available for download.' };
-            case 'deprecate': return { icon: Ban, color: 'text-amber-500', title: 'Deprecate Release', desc: 'This will mark the release as obsolete. Existing users may still have it, but new downloads will be discouraged.' };
-            case 'delete': return { icon: Trash2, color: 'text-red-500', title: 'Delete Permanently', desc: 'This action is irreversible. The file and all its history will be permanently removed from the system.' };
+            case 'deprecate': return { icon: Ban, color: 'text-amber-500', title: 'Deprecate File', desc: 'This will mark the release as obsolete. Existing users may still have it, but new downloads will be discouraged.' };
             default: return { icon: Info, color: 'text-white', title: '', desc: '' };
         }
     }
@@ -362,10 +436,20 @@ export const AgentHub: React.FC = () => {
                              </div>
                              <h3 className={`text-xl font-bold ${styles.textMain}`}>Are you sure?</h3>
                              <p className={`text-sm ${styles.textSub} mt-2`}>{config.desc}</p>
+                             
+                             {/* Warning if actively released */}
+                             {confirmAction === 'deprecate' && selectedPackage.targets.length > 0 && (
+                                <div className="bg-amber-500/10 border border-amber-500/20 rounded p-3 text-xs text-amber-500 mt-2 flex items-start gap-2 text-left">
+                                    <AlertTriangle size={16} className="shrink-0 mt-0.5"/>
+                                    <div>
+                                        <strong>Warning:</strong> This file is currently live on <strong>{selectedPackage.targets.length} targets</strong>. Deprecating it may affect active deployments.
+                                    </div>
+                                </div>
+                             )}
                          </div>
                          <div className="flex gap-3 mt-4">
                              <button onClick={() => setConfirmAction(null)} className={`flex-1 py-3 rounded-lg font-medium border border-inherit ${styles.textSub} hover:bg-white/5`}>Cancel</button>
-                             <button onClick={executeAction} className={`flex-1 py-3 rounded-lg font-bold text-white shadow-lg ${confirmAction === 'delete' ? 'bg-red-600 hover:bg-red-700' : confirmAction === 'deprecate' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-gray-600 hover:bg-gray-500'}`}>
+                             <button onClick={executeAction} className={`flex-1 py-3 rounded-lg font-bold text-white shadow-lg ${confirmAction === 'deprecate' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-gray-600 hover:bg-gray-500'}`}>
                                  Yes, {config.title.split(' ')[0]}
                              </button>
                          </div>
@@ -373,8 +457,8 @@ export const AgentHub: React.FC = () => {
                 ) : (
                     <>
                         <div className="flex items-start gap-4 mb-4">
-                            <div className="p-3 bg-red-500/10 text-red-500 rounded-lg">
-                                <AlertTriangle size={24} />
+                            <div className="p-3 bg-amber-500/10 text-amber-500 rounded-lg">
+                                <Archive size={24} />
                             </div>
                             <div>
                                 <h3 className={`text-lg font-bold ${styles.textMain}`}>Manage Release Status</h3>
@@ -390,11 +474,7 @@ export const AgentHub: React.FC = () => {
                             </button>
                             <button onClick={() => setConfirmAction('deprecate')} className={`w-full p-4 rounded-lg border text-left flex items-center gap-3 transition-colors ${selectedPackage.status === 'deprecated' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-amber-500/10 border-amber-500/30'}`} disabled={selectedPackage.status === 'deprecated'}>
                                 <div className="p-2 bg-amber-500/20 text-amber-500 rounded-full"><Ban size={18}/></div>
-                                <div><div className={`font-bold ${styles.textMain}`}>Deprecate Release</div><div className={`text-xs ${styles.textSub}`}>Mark as obsolete. Prevents new downloads but keeps history.</div></div>
-                            </button>
-                            <button onClick={() => setConfirmAction('delete')} className={`w-full p-4 rounded-lg border text-left flex items-center gap-3 transition-colors hover:bg-red-500/10 border-red-500/30 group`}>
-                                <div className="p-2 bg-red-500/20 text-red-500 rounded-full group-hover:bg-red-500 group-hover:text-white transition-colors"><Trash2 size={18}/></div>
-                                <div><div className={`font-bold text-red-500`}>Delete Permanently</div><div className={`text-xs ${styles.textSub}`}>Remove this file and all associated metadata. Cannot be undone.</div></div>
+                                <div><div className={`font-bold ${styles.textMain}`}>Deprecate File</div><div className={`text-xs ${styles.textSub}`}>Mark as obsolete. Prevents new downloads but keeps history.</div></div>
                             </button>
                         </div>
                         <div className="flex justify-end">
@@ -412,6 +492,19 @@ export const AgentHub: React.FC = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [activeTab, setActiveTab] = useState<'general' | 'compat' | 'activity'>('general');
     const [editForm, setEditForm] = useState(selectedPackage);
+    const [isPreviewMode, setIsPreviewMode] = useState(false); // Markdown Preview State
+
+    // Find existing dependency ID logic
+    const findDependencyId = (platform: string, major: string, minor: string, patch: string) => {
+        const version = `${major}.${minor}.${patch}`;
+        const found = MOCK_RELEASES.find(r => r.product === 'Agent' && r.platform === platform && r.version === version);
+        return found ? found.id : '';
+    };
+
+    const [selectedDepId, setSelectedDepId] = useState(() => {
+        if (selectedPackage.dependencies.isStandalone) return '';
+        return findDependencyId(selectedPackage.platform, selectedPackage.dependencies.major, selectedPackage.dependencies.minor, selectedPackage.dependencies.patch);
+    });
 
     const availableTargets = useMemo(() => {
         return MOCK_TARGETS.filter(t => {
@@ -421,6 +514,12 @@ export const AgentHub: React.FC = () => {
             return true;
         });
     }, [editForm.platform, editForm.arch]);
+
+    const availableDependencies = useMemo(() => {
+        return MOCK_RELEASES
+            .filter(r => r.product === 'Agent' && r.platform === editForm.platform) // Agent on same platform
+            .map(r => ({ id: r.id, label: `Agent v${r.version} (${r.series})` }));
+    }, [editForm.platform]);
 
     const toggleOsSupport = (targetName: string) => {
         setEditForm(prev => {
@@ -435,10 +534,26 @@ export const AgentHub: React.FC = () => {
     };
 
     const handleSave = () => {
+        // Update dependencies structure based on selection
+        let newDeps = { ...editForm.dependencies };
+        if (!newDeps.isStandalone && selectedDepId) {
+             const dep = MOCK_RELEASES.find(r => r.id === selectedDepId);
+             if (dep) {
+                 const [maj, min, pat] = dep.version.split('.');
+                 newDeps = { isStandalone: false, major: maj, minor: min, patch: pat };
+             }
+        } else if (newDeps.isStandalone) {
+             newDeps = { isStandalone: true, major: '', minor: '', patch: '' };
+        }
+
         const newLog: ActivityLog = { id: `a-${Date.now()}`, user: 'current_admin', action: 'Updated package details', timestamp: new Date().toLocaleString() };
         const index = MOCK_RELEASES.findIndex(r => r.id === selectedPackage.id);
         if (index !== -1) {
-            MOCK_RELEASES[index] = { ...editForm, activityLog: [newLog, ...editForm.activityLog] };
+            MOCK_RELEASES[index] = { 
+                ...editForm, 
+                dependencies: newDeps,
+                activityLog: [newLog, ...editForm.activityLog] 
+            };
         }
         setIsEditing(false);
         setIsDetailOpen(false);
@@ -451,18 +566,104 @@ export const AgentHub: React.FC = () => {
                   <div className="flex items-start gap-4">
                       <div className={`p-3 rounded-lg ${theme === AppTheme.LIGHT ? 'bg-blue-100 text-blue-600' : 'bg-blue-500/20 text-blue-400'}`}><Package size={24} /></div>
                       <div>
+                          <div className="text-xs font-bold uppercase opacity-50 mb-1">Package Detail</div>
                           <h2 className={`text-xl font-bold ${styles.textMain} flex items-center gap-2`}>{editForm.filename}{editForm.status === 'deprecated' ? <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-500 border border-red-500/20">Deprecated</span> : (editForm.targets.length > 0 ? <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 border border-green-500/20">Released</span> : <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-gray-500/20 text-gray-500 border border-gray-500/20">Not Released</span>)}</h2>
                           <div className={`flex items-center gap-4 text-xs mt-1 ${styles.textSub}`}><span className="flex items-center gap-1"><Monitor size={12}/> {editForm.platform} / {editForm.series}</span><span className="flex items-center gap-1"><Cpu size={12}/> {editForm.arch.join(', ')}</span><span className="flex items-center gap-1"><Clock size={12}/> {editForm.uploadedAt}</span></div>
                       </div>
                   </div>
                   <div className="flex items-center gap-2">
-                      {!isEditing ? <button onClick={() => setIsEditing(true)} className={`px-3 py-1.5 text-sm rounded-md border flex items-center gap-2 hover:bg-opacity-10 hover:bg-blue-500 transition-colors ${styles.textMain} border-inherit`}><Edit3 size={14} /> Edit Details</button> : <div className="flex gap-2"><button onClick={() => { setIsEditing(false); setEditForm(selectedPackage); }} className="px-3 py-1.5 text-sm rounded-md border border-red-500/30 text-red-500 hover:bg-red-500/10">Cancel</button><button onClick={handleSave} className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-2 ${styles.buttonPrimary}`}><Save size={14} /> Save Changes</button></div>}
+                      {!isEditing ? (
+                          selectedPackage.status !== 'deprecated' && (
+                            <button onClick={() => setIsEditing(true)} className={`px-3 py-1.5 text-sm rounded-md border flex items-center gap-2 hover:bg-opacity-10 hover:bg-blue-500 transition-colors ${styles.textMain} border-inherit`}><Edit3 size={14} /> Edit Details</button>
+                          )
+                      ) : <div className="flex gap-2"><button onClick={() => { setIsEditing(false); setEditForm(selectedPackage); }} className="px-3 py-1.5 text-sm rounded-md border border-red-500/30 text-red-500 hover:bg-red-500/10">Cancel</button><button onClick={handleSave} className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-2 ${styles.buttonPrimary}`}><Save size={14} /> Save Changes</button></div>}
                       <button onClick={() => setIsDetailOpen(false)} className={`p-2 hover:text-red-500 transition-colors ${styles.textSub}`}><X size={20} /></button>
                   </div>
               </div>
               <div className={`flex px-6 border-b border-inherit gap-6 ${styles.textSub}`}><button onClick={() => setActiveTab('general')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'general' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>General & Docs</button><button onClick={() => setActiveTab('compat')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'compat' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>Compatibility</button><button onClick={() => setActiveTab('activity')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'activity' ? styles.tabActive : 'border-transparent ' + styles.tabInactive}`}>File Activity</button></div>
               <div className="flex-1 overflow-y-auto p-6 bg-opacity-50">
-                  {activeTab === 'general' && <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2"><div className={`p-4 rounded border ${theme === AppTheme.LIGHT ? 'bg-gray-50 border-gray-200' : 'bg-black/20 border-white/10'}`}><h4 className={`text-xs font-bold uppercase mb-3 ${styles.textSub}`}>Release Configuration</h4><div className="grid grid-cols-2 gap-4"><div><div className="text-[10px] opacity-60 mb-1">ACTIVE CHANNELS</div><div className="flex flex-wrap gap-2">{editForm.channels.length > 0 ? editForm.channels.map(c => <Badge key={c} colorClass="bg-blue-500/20 text-blue-400 border border-blue-500/30">{c}</Badge>) : <span className="text-sm opacity-50 italic">None</span>}</div></div><div><div className="text-[10px] opacity-60 mb-1">RELEASE TARGETS</div><div className="space-y-1">{editForm.targets.length > 0 ? editForm.targets.map(t => <div key={t} className="flex items-center gap-2 text-sm font-medium">{t.includes('Spotlight') ? <Globe size={14} className="text-purple-400"/> : <Zap size={14} className="text-orange-400"/>}<span>{t}</span></div>) : <span className="text-sm opacity-50 italic">Not Released</span>}</div></div></div></div><div className="space-y-2"><label className={`text-xs font-bold uppercase tracking-wider ${styles.textSub}`}>Description</label>{isEditing ? <input className={`w-full p-2 rounded border outline-none focus:ring-1 focus:ring-blue-500 ${styles.input}`} value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} /> : <p className={`${styles.textMain} text-sm`}>{editForm.description || <span className="opacity-50 italic">No description provided.</span>}</p>}</div><div className="space-y-2"><label className={`text-xs font-bold uppercase tracking-wider ${styles.textSub}`}>Release Notes</label>{isEditing ? <textarea className={`w-full h-48 p-4 rounded border outline-none focus:ring-1 focus:ring-blue-500 font-mono text-sm ${styles.input}`} value={editForm.releaseNotes} onChange={e => setEditForm({...editForm, releaseNotes: e.target.value})} /> : <div className={`w-full p-4 rounded border font-mono text-sm whitespace-pre-wrap ${styles.input} bg-opacity-50`}>{editForm.releaseNotes || <span className="opacity-50 italic">No notes available.</span>}</div>}</div></div>}
+                  {activeTab === 'general' && <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                      <div className={`p-4 rounded border ${theme === AppTheme.LIGHT ? 'bg-gray-50 border-gray-200' : 'bg-black/20 border-white/10'}`}>
+                          <h4 className={`text-xs font-bold uppercase mb-3 ${styles.textSub}`}>Release Configuration</h4>
+                          <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                  <div className="text-[10px] opacity-60 mb-1">ACTIVE CHANNELS</div>
+                                  <div className="flex flex-wrap gap-2">{editForm.channels.length > 0 ? editForm.channels.map(c => <Badge key={c} colorClass="bg-blue-500/20 text-blue-400 border border-blue-500/30">{c}</Badge>) : <span className="text-sm opacity-50 italic">None</span>}</div>
+                              </div>
+                              <div>
+                                  <div className="text-[10px] opacity-60 mb-1">RELEASE TARGETS</div>
+                                  <div className="space-y-1">{editForm.targets.length > 0 ? editForm.targets.map(t => <div key={t} className="flex items-center gap-2 text-sm font-medium">{t.includes('Spotlight') ? <Globe size={14} className="text-purple-400"/> : <Zap size={14} className="text-orange-400"/>}<span>{t}</span></div>) : <span className="text-sm opacity-50 italic">Not Released</span>}</div>
+                              </div>
+                          </div>
+                      </div>
+
+                      {/* Dependencies Editing Section */}
+                      <div className={`p-4 rounded border ${styles.input}`}>
+                          <div className="flex justify-between items-center mb-2">
+                              <label className={`text-xs font-bold uppercase ${styles.textSub}`}>Dependencies</label>
+                              {isEditing && (
+                                  <label className="flex items-center gap-2">
+                                      <input 
+                                          type="checkbox" 
+                                          checked={editForm.dependencies.isStandalone} 
+                                          onChange={e => setEditForm({...editForm, dependencies: {...editForm.dependencies, isStandalone: e.target.checked}})} 
+                                          className="rounded text-blue-600" 
+                                      />
+                                      <span className={`text-sm ${styles.textMain}`}>Standalone</span>
+                                  </label>
+                              )}
+                          </div>
+                          {isEditing ? (
+                              <div className={`relative ${editForm.dependencies.isStandalone ? 'opacity-30 pointer-events-none' : ''}`}>
+                                  <select 
+                                      value={selectedDepId} 
+                                      onChange={e => setSelectedDepId(e.target.value)} 
+                                      className={`w-full p-2 rounded border ${styles.inputGroup}`}
+                                  >
+                                      <option value="">Select Base Dependency...</option>
+                                      {availableDependencies.map(dep => (<option key={dep.id} value={dep.id}>{dep.label}</option>))}
+                                  </select>
+                              </div>
+                          ) : (
+                              <div>
+                                  {editForm.dependencies.isStandalone ? (
+                                      <Badge colorClass="bg-green-500/10 text-green-500 border border-green-500/20">Standalone</Badge>
+                                  ) : (
+                                      <div className="flex items-center gap-2">
+                                          <Badge colorClass="bg-amber-500/10 text-amber-500 border border-amber-500/20">Requires Agent</Badge>
+                                          <span className="font-mono text-sm">v{editForm.dependencies.major}.{editForm.dependencies.minor}.{editForm.dependencies.patch}</span>
+                                      </div>
+                                  )}
+                              </div>
+                          )}
+                      </div>
+
+                      <div className="space-y-2"><label className={`text-xs font-bold uppercase tracking-wider ${styles.textSub}`}>Description</label>{isEditing ? <input className={`w-full p-2 rounded border outline-none focus:ring-1 focus:ring-blue-500 ${styles.input}`} value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} /> : <p className={`${styles.textMain} text-sm`}>{editForm.description || <span className="opacity-50 italic">No description provided.</span>}</p>}</div>
+                      
+                      {/* Release Notes with Markdown Toggle */}
+                      <div className="space-y-2">
+                          <div className="flex justify-between items-center">
+                              <label className={`text-xs font-bold uppercase tracking-wider ${styles.textSub}`}>Release Notes</label>
+                              {isEditing && (
+                                <div className="flex gap-1">
+                                    <button onClick={() => setIsPreviewMode(false)} className={`px-2 py-0.5 text-[10px] rounded-l border ${!isPreviewMode ? 'bg-blue-500 text-white' : styles.input}`}>Write</button>
+                                    <button onClick={() => setIsPreviewMode(true)} className={`px-2 py-0.5 text-[10px] rounded-r border ${isPreviewMode ? 'bg-blue-500 text-white' : styles.input}`}>Preview</button>
+                                </div>
+                              )}
+                          </div>
+                          {isEditing ? (
+                              isPreviewMode ? (
+                                  <div className={`w-full h-48 p-4 rounded border overflow-y-auto font-mono text-sm ${styles.input} bg-opacity-50`}>
+                                      {editForm.releaseNotes || <span className="opacity-50 italic">No content.</span>}
+                                  </div>
+                              ) : (
+                                  <textarea className={`w-full h-48 p-4 rounded border outline-none focus:ring-1 focus:ring-blue-500 font-mono text-sm ${styles.input}`} value={editForm.releaseNotes} onChange={e => setEditForm({...editForm, releaseNotes: e.target.value})} /> 
+                              )
+                          ) : (
+                              <div className={`w-full p-4 rounded border font-mono text-sm whitespace-pre-wrap ${styles.input} bg-opacity-50`}>{editForm.releaseNotes || <span className="opacity-50 italic">No notes available.</span>}</div>
+                          )}
+                      </div>
+                  </div>}
                   {activeTab === 'compat' && <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 h-full flex flex-col"><div className="flex justify-between items-center"><h3 className={`font-bold ${styles.textMain}`}>Supported OS Targets</h3><div className={`text-xs ${styles.textSub}`}>{editForm.supportOS.length} targets selected</div></div>{isEditing ? <div className={`flex-1 overflow-y-auto border rounded-md p-2 ${styles.input}`}><div className="grid grid-cols-1 md:grid-cols-2 gap-2">{availableTargets.map(t => { const isSelected = editForm.supportOS.includes(t.name); return (<div key={t.id} onClick={() => toggleOsSupport(t.name)} className={`p-3 rounded border cursor-pointer flex items-center gap-3 select-none transition-colors ${isSelected ? 'bg-blue-500/10 border-blue-500 ring-1 ring-blue-500/50' : 'border-transparent hover:bg-gray-500/10'}`}><div className={`w-4 h-4 rounded border flex items-center justify-center ${isSelected ? 'bg-blue-500 border-blue-500 text-white' : 'border-gray-500'}`}>{isSelected && <Check size={10} />}</div><div><div className={`text-sm font-medium ${styles.textMain}`}>{t.name}</div><div className="text-xs opacity-50 font-mono">{t.code}</div></div></div>); })}</div></div> : <div className={`flex-1 overflow-y-auto border rounded-md ${styles.input}`}>{editForm.supportOS.length > 0 ? (<table className="w-full text-left text-sm"><thead className="bg-black/10"><tr><th className="p-3 font-semibold text-xs uppercase opacity-70">Target Name</th><th className="p-3 font-semibold text-xs uppercase opacity-70">Status</th></tr></thead><tbody>{editForm.supportOS.map((os, i) => (<tr key={i} className="border-b border-inherit last:border-0 hover:bg-white/5"><td className="p-3 font-medium flex items-center gap-2"><Monitor size={14} className="opacity-50"/> {os}</td><td className="p-3"><span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 border border-green-500/20">Verified</span></td></tr>))}</tbody></table>) : <div className="p-8 text-center opacity-50"><AlertTriangle size={24} className="mx-auto mb-2"/><p>No OS targets specified.</p></div>}</div>}</div>}
                   {activeTab === 'activity' && <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2"><div className="relative pl-4 space-y-6"><div className="absolute left-0 top-2 bottom-2 w-0.5 bg-gray-500/20"></div>{editForm.activityLog && editForm.activityLog.length > 0 ? editForm.activityLog.map((log, index) => (<div key={log.id} className="relative pl-6"><div className={`absolute left-[-5px] top-1 w-2.5 h-2.5 rounded-full border-2 ${theme === AppTheme.LIGHT ? 'bg-white border-blue-500' : 'bg-slate-800 border-blue-400'} z-10`}></div><div className="flex flex-col"><span className={`text-sm font-medium ${styles.textMain}`}>{log.action}</span><div className="flex items-center gap-2 text-xs opacity-60 mt-1"><span className="flex items-center gap-1"><User size={10}/> {log.user}</span><span>•</span><span className="flex items-center gap-1"><Calendar size={10}/> {log.timestamp}</span></div></div></div>)) : <p className="text-sm opacity-50 italic pl-6">No activity recorded.</p>}</div></div>}
               </div>
@@ -592,7 +793,7 @@ export const AgentHub: React.FC = () => {
                             <Globe size={32}/>
                         </div>
                         <div>
-                            <span className={`text-lg font-bold block ${styles.textMain}`}>Generic Release</span>
+                            <span className={`text-lg font-bold block ${styles.textMain}`}>Generic</span>
                             <span className={`text-xs opacity-60 mt-1 block`}>Standard build available to all customers. Used for general updates and feature rollouts.</span>
                         </div>
                         {formData.releaseType === 'Generic' && <div className="absolute top-4 right-4 text-blue-500"><CheckCircle2 size={24}/></div>}
@@ -604,7 +805,7 @@ export const AgentHub: React.FC = () => {
                             <Lock size={32}/>
                         </div>
                         <div>
-                            <span className={`text-lg font-bold block ${styles.textMain}`}>Customized Release</span>
+                            <span className={`text-lg font-bold block ${styles.textMain}`}>Customized</span>
                             <span className={`text-xs opacity-60 mt-1 block`}>Private build specific to a single customer. Contains proprietary configs or features.</span>
                         </div>
                         {formData.releaseType === 'Customized' && <div className="absolute top-4 right-4 text-amber-500"><CheckCircle2 size={24}/></div>}
@@ -614,14 +815,12 @@ export const AgentHub: React.FC = () => {
                 {formData.releaseType === 'Customized' && (
                     <div className="animate-in fade-in slide-in-from-bottom-2 pt-4 border-t border-dashed border-gray-500/30">
                         <label className={`text-xs font-bold uppercase mb-2 block ${styles.textSub}`}>Select Target Customer</label>
-                        <select 
-                            className={`w-full p-4 rounded-lg border text-lg ${styles.input}`}
+                        <SearchableSelect 
+                            options={MOCK_CUSTOMERS}
                             value={formData.selectedCustomer}
-                            onChange={(e) => setFormData({...formData, selectedCustomer: e.target.value})}
-                        >
-                            <option value="">-- Select Customer --</option>
-                            {MOCK_CUSTOMERS.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
+                            onChange={(val) => setFormData({...formData, selectedCustomer: val})}
+                            placeholder="-- Select Customer --"
+                        />
                         <p className="text-xs text-amber-500 mt-2 flex items-center gap-1">
                             <Info size={14}/> 
                             <span>This selection will filter available <strong>Series</strong> in the next step.</span>
@@ -777,6 +976,20 @@ export const AgentHub: React.FC = () => {
 
     const renderStep4_Upload = () => (
         <div className="flex flex-col h-full space-y-6 animate-in fade-in slide-in-from-right-4">
+            
+            {/* Upload Area Instructions */}
+            <div className={`p-4 rounded-lg border border-dashed ${styles.input} bg-opacity-30 border-blue-500/30`}>
+                <h4 className="text-sm font-bold flex items-center gap-2 mb-2 text-blue-500">
+                    <FileBadge size={16}/> Package Requirements
+                </h4>
+                <ul className="list-disc list-inside text-xs opacity-70 space-y-1.5 leading-relaxed">
+                    <li>Filename must strictly follow the format: <strong>{`{Product}_{Platform}_{Series}_v{Version}.{ext}`}</strong></li>
+                    <li>Ensure the <strong>SHA256</strong> & <strong>MD5</strong> checksums match your local build artifact.</li>
+                    <li>Do not upload debug builds or unsigned binaries for Production release channels.</li>
+                    <li>Maximum file size is <strong>2GB</strong>. For larger files, use the CLI tool.</li>
+                </ul>
+            </div>
+
             <div className={`flex-1 border-2 border-dashed rounded-xl flex flex-col items-center justify-center relative ${styles.input} border-opacity-50 transition-colors ${file ? 'bg-blue-500/5 border-blue-500/50' : ''}`}>
                 {!file ? (
                     <div className="text-center p-8 cursor-pointer">
@@ -792,10 +1005,18 @@ export const AgentHub: React.FC = () => {
                         <div className={`mt-6 space-y-2 text-sm p-4 rounded bg-black/10 text-left font-mono ${styles.textSub}`}>
                             <div className="flex justify-between"><span>Size:</span> <span>24.5 MB</span></div>
                             <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-500/20">
-                                <span>SHA256:</span>
+                                <span className="opacity-50">SHA256</span>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-[10px] opacity-70 bg-black/20 p-1 rounded">
+                                    <span className="text-[10px] opacity-90 bg-black/20 px-2 py-0.5 rounded truncate max-w-[200px]">
                                         e3b0c442...855
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="opacity-50">MD5</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] opacity-90 bg-black/20 px-2 py-0.5 rounded truncate max-w-[200px]">
+                                        d41d8cd98f00b204e9800998ecf8427e
                                     </span>
                                 </div>
                             </div>
@@ -805,18 +1026,6 @@ export const AgentHub: React.FC = () => {
                 )}
             </div>
             
-            {/* Help Text for Upload */}
-            <div className="grid grid-cols-2 gap-4 text-xs opacity-60 px-2">
-                <div className="flex gap-2">
-                    <Info size={14} className="shrink-0 mt-0.5" />
-                    <p>Ensure file integrity matches the generated SHA256 checksum before confirming upload.</p>
-                </div>
-                <div className="flex gap-2">
-                    <ShieldAlert size={14} className="shrink-0 mt-0.5" />
-                    <p>Executable files (.exe, .sh) are automatically scanned for malware upon upload.</p>
-                </div>
-            </div>
-
             {/* Description Input Moved Here */}
             <div>
                 <label className={`text-xs font-bold uppercase mb-2 block ${styles.textSub}`}>Description</label>
@@ -913,7 +1122,7 @@ export const AgentHub: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className={`p-4 rounded-xl border ${styles.input}`}>
                         <h4 className="text-xs font-bold uppercase opacity-50 mb-3 tracking-wider flex items-center gap-2"><FileBox size={14}/> File Artifact</h4>
-                        <div className="space-y-2 text-sm">
+                        <div className="space-y-3 text-sm">
                             <div className="flex justify-between">
                                 <span className="opacity-70">Filename:</span>
                                 <span className={`font-mono font-bold truncate max-w-[120px] ${styles.textMain}`} title={file?.name}>{file?.name || 'No file selected'}</span>
@@ -922,26 +1131,32 @@ export const AgentHub: React.FC = () => {
                                 <span className="opacity-70">Size:</span>
                                 <span className="font-mono">24.5 MB</span>
                             </div>
-                            <div className="flex justify-between items-center">
-                                <span className="opacity-70">SHA256:</span>
-                                <span className="font-mono text-[10px] opacity-50 bg-black/20 px-1 rounded">e3b0...855</span>
+                            <div className="pt-2 border-t border-gray-500/20 space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <span className="opacity-50 text-[10px] uppercase">SHA256</span>
+                                    <span className="font-mono text-[10px] opacity-50 bg-black/20 px-1.5 py-0.5 rounded">e3b0...855</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="opacity-50 text-[10px] uppercase">MD5</span>
+                                    <span className="font-mono text-[10px] opacity-50 bg-black/20 px-1.5 py-0.5 rounded">d41d...427e</span>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div className={`p-4 rounded-xl border flex flex-col ${styles.input} max-h-48`}>
-                        <div className="flex justify-between items-center mb-3">
+                    <div className={`p-4 rounded-xl border flex flex-col ${styles.input} h-64`}>
+                        <div className="flex justify-between items-center mb-3 pb-2 border-b border-gray-500/20">
                             <h4 className="text-xs font-bold uppercase opacity-50 tracking-wider flex items-center gap-2"><Layers size={14}/> Targets</h4>
                             <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-500 font-bold">{formData.selectedTargets.length}</span>
                         </div>
                         <div className="flex-1 overflow-y-auto pr-1 space-y-1 custom-scrollbar">
                             {selectedTargetsList.length > 0 ? selectedTargetsList.map(t => (
-                                <div key={t.id} className="flex items-center justify-between text-xs p-1.5 rounded hover:bg-white/5 border border-transparent hover:border-white/10">
+                                <div key={t.id} className="flex items-center justify-between text-xs p-2 rounded bg-white/5 border border-transparent">
                                     <span className="font-medium truncate max-w-[120px]" title={t.name}>{t.name}</span>
                                     <span className="opacity-50 font-mono text-[10px]">{t.osVer}</span>
                                 </div>
                             )) : (
-                                <div className="text-center opacity-50 text-xs italic py-4">No targets selected</div>
+                                <div className="text-center opacity-50 text-xs italic py-10">No targets selected</div>
                             )}
                         </div>
                     </div>
@@ -1456,7 +1671,6 @@ export const AgentHub: React.FC = () => {
                           <th className="p-4 font-semibold">Platform</th>
                           <th className="p-4 font-semibold">Arch</th>
                           <th className="p-4 font-semibold">Series</th>
-                          <th className="p-4 font-semibold">Support OS</th>
                           <th className="p-4 font-semibold">Version Info</th>
                           <th className="p-4 font-semibold">Dependencies</th>
                           <th className="p-4 font-semibold">Status</th>
@@ -1476,13 +1690,13 @@ export const AgentHub: React.FC = () => {
                              onClick={() => { setSelectedPackage(item); setIsDetailOpen(true); }}
                           >
                               {/* Product */}
-                              <td className="p-4 align-top text-center">
-                                  <div className="flex flex-col items-center gap-1 w-12 mx-auto">
-                                      {item.product === 'Agent' && <div className="p-2 rounded bg-blue-500/20 text-blue-500"><Monitor size={18}/></div>}
-                                      {item.product === 'OTA Img' && <div className="p-2 rounded bg-purple-500/20 text-purple-500"><Layers size={18}/></div>}
-                                      {item.product === 'Tool' && <div className="p-2 rounded bg-orange-500/20 text-orange-500"><Wrench size={18}/></div>}
-                                      {item.product === 'Library' && <div className="p-2 rounded bg-green-500/20 text-green-500"><FileBox size={18}/></div>}
-                                      <span className="text-[10px] font-bold uppercase">{item.product}</span>
+                              <td className="p-4 align-top">
+                                  <div className="flex items-center gap-2">
+                                      {item.product === 'Agent' && <Monitor size={16} className="text-blue-500"/>}
+                                      {item.product === 'OTA Img' && <Layers size={16} className="text-purple-500"/>}
+                                      {item.product === 'Tool' && <Wrench size={16} className="text-orange-500"/>}
+                                      {item.product === 'Library' && <FileBox size={16} className="text-green-500"/>}
+                                      <span className="font-medium text-sm">{item.product}</span>
                                   </div>
                               </td>
 
@@ -1498,29 +1712,15 @@ export const AgentHub: React.FC = () => {
 
                               {/* Architecture */}
                               <td className="p-4 align-top">
-                                  <div className="flex flex-wrap gap-1 max-w-[100px]">
-                                      {item.arch.map(a => (
-                                          <Badge key={a} colorClass="bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">{a}</Badge>
-                                      ))}
+                                  <div className={`font-mono text-sm ${styles.textSub}`}>
+                                      {item.arch.join(', ')}
                                   </div>
                               </td>
 
                               {/* Series */}
                               <td className="p-4 align-top">
-                                  <div className={`text-xs px-2 py-0.5 rounded-md inline-block bg-opacity-20 bg-gray-500 whitespace-nowrap`}>
+                                  <div className="text-sm font-medium">
                                       {item.series}
-                                  </div>
-                              </td>
-
-                              {/* Support OS (Cleaned) */}
-                              <td className="p-4 align-top">
-                                  <div className="flex flex-wrap gap-1 items-center max-w-[150px]">
-                                      {item.supportOS.slice(0, 2).map((os, i) => (
-                                          <Badge key={i}>{os}</Badge>
-                                      ))}
-                                      {item.supportOS.length > 2 && (
-                                          <span className="text-[10px] opacity-50 px-1">+{item.supportOS.length - 2}</span>
-                                      )}
                                   </div>
                               </td>
 
@@ -1536,7 +1736,7 @@ export const AgentHub: React.FC = () => {
                               {/* Dependencies */}
                               <td className="p-4 align-top">
                                   {item.dependencies.isStandalone ? (
-                                      <span className="text-[10px] px-2 py-0.5 rounded border border-green-500/30 bg-green-500/10 text-green-500">Standalone</span>
+                                      <span className={`text-xs ${styles.textSub}`}>Standalone</span>
                                   ) : (
                                       <div className="flex flex-col text-xs">
                                           <span className="opacity-60 text-[10px] uppercase">Requires:</span>
@@ -1592,21 +1792,18 @@ export const AgentHub: React.FC = () => {
                                       </div>
                                       <div className="flex gap-1 mt-1">
                                           <button 
-                                            onClick={(e) => { e.stopPropagation(); setSelectedPackage(item); setIsDetailOpen(true); }}
-                                            className={`p-1.5 rounded hover:bg-blue-500/20 text-blue-500 transition-colors`}
-                                            title="Edit File Details"
+                                            title="Download Package"
+                                            onClick={(e) => e.stopPropagation()} 
+                                            className={`p-1.5 rounded hover:bg-gray-500/20 text-gray-400 transition-colors`}
                                           >
-                                              <Edit3 size={14} />
-                                          </button>
-                                          <button onClick={(e) => e.stopPropagation()} className={`p-1.5 rounded hover:bg-gray-500/20 text-gray-400 transition-colors`}>
                                               <Download size={14} />
                                           </button>
                                           <button 
                                             onClick={(e) => { e.stopPropagation(); setSelectedPackage(item); setIsStatusOpen(true); }}
-                                            className={`p-1.5 rounded hover:bg-red-500/20 text-red-500 transition-colors`}
-                                            title="Manage Status / Delete"
+                                            className={`p-1.5 rounded hover:bg-amber-500/20 text-slate-400 hover:text-amber-500 transition-colors`}
+                                            title="Manage Status"
                                           >
-                                              <Trash2 size={14} />
+                                              <Archive size={14} />
                                           </button>
                                       </div>
                                   </div>
