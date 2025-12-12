@@ -351,8 +351,8 @@ const DetailEditModal: React.FC<DetailEditModalProps> = ({ packageData, isOpen, 
                   <div className="flex items-start gap-4">
                       <div className={`p-3 rounded-lg ${theme === AppTheme.LIGHT ? 'bg-blue-100 text-blue-600' : 'bg-blue-500/20 text-blue-400'}`}><Package size={24} /></div>
                       <div>
-                          <div className="text-xs font-bold uppercase opacity-50 mb-1">Application Detail</div>
-                          <h2 className={`text-2xl font-bold ${styles.textMain} flex items-center gap-2`}>
+                          <h2 className="text-xs font-bold uppercase opacity-50 mb-1">Application Detail</h2>
+                          <div className={`text-2xl font-bold ${styles.textMain} flex items-center gap-2`}>
                               {editForm.filename}
                               {editForm.status === 'decommissioned' ? (
                                   <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-500 border border-red-500/20">Decommissioned</span>
@@ -361,7 +361,7 @@ const DetailEditModal: React.FC<DetailEditModalProps> = ({ packageData, isOpen, 
                               ) : (
                                   <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-gray-500/20 text-gray-500 border border-gray-500/20">Not Released</span>
                               )}
-                          </h2>
+                          </div>
                           <div className={`flex items-center gap-4 text-xs mt-1 ${styles.textSub}`}>
                               <span className="flex items-center gap-1"><Clock size={12}/> Uploaded: {editForm.uploadedAt}</span>
                           </div>
